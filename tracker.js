@@ -57,12 +57,19 @@
       if(!res.ok)throw new Error(res.status);
       const body=await res.json();
       // Drop only what the server confirmed; anything queued meanwhile stays.
-      const now=outbox(),ok=new Set(body.accepted||[]);
+      const now=outbox(),ok=new Set([...(body.accepted||[]),...(body.rejected||[])]);
       now.joins=now.joins.filter(j=>!sent.joins.includes(j.key));
       now.results=now.results.filter(r=>!ok.has(r.id));
       LS.set('cc-outbox',now);
       if(Array.isArray(body.players))mergeRoster(body.players);
       LS.set('cc-tour',body.tournament||null);
+      if(body.registration)LS.set('cc-reg',body.registration);
+      // Sign-ups the server refused (registration closed): forget them, and sign out if it was this phone's student.
+      if(Array.isArray(body.refused)&&body.refused.length){
+        const no=new Set(body.refused);
+        LS.set('cc-roster',roster().filter(p=>!no.has(p.key)));
+        const m=LS.get('cc-me',null);if(m&&no.has(m.key)){LS.set('cc-me',null);LS.set('cc-refused',m.name)}
+      }
       LS.set('cc-busy',{at:Date.now(),keys:Array.isArray(body.battling)?body.battling:[]});
       online=true;
     }catch(e){online=false}
@@ -100,6 +107,8 @@
   }
   // Keys of students battling on another phone, from a sync in the last minute (empty when offline longer).
   const battling=()=>{const b=LS.get('cc-busy',null);return new Set(b&&b.keys&&Date.now()-b.at<60000?b.keys:[])};
-  window.CC={CLASSES,TEAMS,roster,addPlayer,recordResult,setPresence,sync,me,battling,signIn,signOut,tournament,findMatch,person,myStatus,
+  const registration=()=>{const r=LS.get('cc-reg',null);return r?{...r,open:r.open&&!(r.closesAt&&Date.now()>=r.closesAt)}:{open:true,closesAt:null}};
+  function takeRefused(){const n=LS.get('cc-refused',null);LS.set('cc-refused',null);return n}
+  window.CC={registration,takeRefused,CLASSES,TEAMS,roster,addPlayer,recordResult,setPresence,sync,me,battling,signIn,signOut,tournament,findMatch,person,myStatus,
     onStatus(f){listeners.push(f);emit()}};
 })();

@@ -22,6 +22,13 @@ const devices=new Map();   // device -> {device,status,players:[key],seen}  (mem
 const TOUR_FILE=path.join(DATA,'tournament.json');
 let tour=null;             // see startTournament()
 try{tour=JSON.parse(fs.readFileSync(TOUR_FILE,'utf8'))}catch(e){}
+// Registration: once closed (now, or at closesAt), only students already joined can play.
+const REG_FILE=path.join(DATA,'registration.json');
+let reg={open:true,closesAt:null};
+try{reg={...reg,...JSON.parse(fs.readFileSync(REG_FILE,'utf8'))}}catch(e){}
+const regOpen=(now=Date.now())=>reg.open&&!(reg.closesAt&&now>=reg.closesAt);
+function setReg(r){reg=r;fs.writeFileSync(REG_FILE,JSON.stringify(reg))}
+const publicReg=()=>({open:regOpen(),closesAt:reg.open?reg.closesAt:null});
 
 try{for(const p of JSON.parse(fs.readFileSync(PLAYERS_FILE,'utf8')))players.set(p.key,p)}catch(e){}
 try{for(const line of fs.readFileSync(RESULTS_FILE,'utf8').split('\n')){
@@ -48,6 +55,8 @@ function person(p){
 }
 function upsertPlayer(p,now){
   const old=players.get(p.key);
+  if(!old&&!regOpen(now))return null;
+  if(old&&!regOpen(now))p={...p,team:old.team};
   if(old&&old.name===p.name&&old.team===p.team&&now-old.lastSeen<60000)return old;
   const rec={...p,joinedAt:old?old.joinedAt:now,lastSeen:now};
   players.set(p.key,rec);savePlayers();return rec;
@@ -57,6 +66,7 @@ function result(r,device,now){
   if(!Array.isArray(r.players)||r.players.length!==2)return null;
   const ps=r.players.map(p=>{const q=person(p);if(!q)return null;const score=Math.trunc(+p.score);return score>=0&&score<100?{...q,score}:null});
   if(ps.includes(null)||ps[0].key===ps[1].key)return null;
+  if(!regOpen(now)&&ps.some(p=>!players.has(p.key)))return null;
   const winner=+r.winner;if(winner!==0&&winner!==1)return null;
   const at=Math.trunc(+r.at);
   const match=typeof r.match==='string'&&r.match.length<64?r.match:undefined;
@@ -163,10 +173,10 @@ async function api(req,res,pathname){
     const b=await readJson(req);
     const device=clean(b.device).slice(0,64)||'unknown';
     for(const j of Array.isArray(b.joins)?b.joins.slice(0,500):[]){const p=person(j);if(p)upsertPlayer(p,now)}
-    const accepted=[],fresh=[];
+    const accepted=[],fresh=[],rejected=[];
     for(const r of Array.isArray(b.results)?b.results.slice(0,500):[]){
       if(r&&resultIds.has(r.id)){accepted.push(r.id);continue}
-      const rec=result(r,device,now);if(!rec)continue;
+      const rec=result(r,device,now);if(!rec){if(r&&r.id)rejected.push(String(r.id).slice(0,64));continue}
       rec.players.forEach(p=>upsertPlayer({key:p.key,name:p.name,cls:p.cls,team:p.team},now));
       resultIds.add(rec.id);results.push(rec);fresh.push(JSON.stringify(rec));accepted.push(rec.id);
       if(rec.match){const m=findMatch(rec.match),keys=rec.players.map(p=>p.key);
@@ -176,11 +186,12 @@ async function api(req,res,pathname){
     const pr=b.presence||{};
     const seated=(Array.isArray(pr.players)?pr.players:[]).map(person).filter(Boolean).slice(0,2);
     seated.forEach(p=>upsertPlayer(p,now));
+    const refused=(Array.isArray(b.joins)?b.joins:[]).map(person).filter(p=>p&&!players.has(p.key)).map(p=>p.key);
     devices.set(device,{device,status:pr.status==='battle'?'battle':'lobby',players:seated.map(p=>p.key),
       score:Array.isArray(pr.score)?pr.score.slice(0,2).map(n=>Math.trunc(+n)||0):null,seen:now});
     // Students seated on another phone right now, so nobody can pick them for a second battle.
     const battling=[...new Set([...devices.values()].filter(d=>d.device!==device&&d.status==='battle'&&now-d.seen<ONLINE_MS).flatMap(d=>d.players))];
-    return send(res,200,{ok:true,accepted,battling,tournament:publicTour(),players:[...players.values()].map(({key,name,cls,team})=>({key,name,cls,team}))});
+    return send(res,200,{ok:true,accepted,rejected,refused,registration:publicReg(),battling,tournament:publicTour(),players:[...players.values()].map(({key,name,cls,team})=>({key,name,cls,team}))});
   }
   if(pathname==='/api/players'&&req.method==='GET')
     return send(res,200,{players:[...players.values()].map(({key,name,cls,team})=>({key,name,cls,team}))});
@@ -189,12 +200,18 @@ async function api(req,res,pathname){
     if(!isAdmin(req))return send(res,401,{error:'Wrong password'});
     if(pathname==='/api/admin/state'&&req.method==='GET'){
       for(const [k,d] of devices)if(now-d.seen>ONLINE_MS*4)devices.delete(k);
-      return send(res,200,{now,publicUrl:PUBLIC_URL,classes:CLASSES,teams:TEAMS,players:[...players.values()],results,tournament:publicTour(),
+      return send(res,200,{now,publicUrl:PUBLIC_URL,classes:CLASSES,teams:TEAMS,players:[...players.values()],results,tournament:publicTour(),registration:reg,
         devices:[...devices.values()].filter(d=>now-d.seen<ONLINE_MS)});
+    }
+    if(pathname==='/api/admin/registration'&&req.method==='POST'){
+      const b=await readJson(req);
+      const at=b.closesAt==null?null:Math.trunc(+b.closesAt);
+      setReg({open:!!b.open,closesAt:at>0?at:null});
+      return send(res,200,{ok:true,registration:reg});
     }
     if(pathname==='/api/admin/tournament'&&req.method==='POST'){
       const b=await readJson(req);
-      if(b.action==='start'){if(!startTournament())return send(res,400,{error:'No students have joined yet'})}
+      if(b.action==='start'){if(!startTournament())return send(res,400,{error:'No students have joined yet'});setReg({open:false,closesAt:null})}
       else if(b.action==='stop'){tour=null;fs.rmSync(TOUR_FILE,{force:true})}
       else if(b.action==='winner'){if(!decide(findMatch(b.match),b.winner,null))return send(res,400,{error:'Match already decided'})}
       return send(res,200,{ok:true,tournament:publicTour()});
@@ -202,7 +219,7 @@ async function api(req,res,pathname){
     if(pathname==='/api/admin/reset'&&req.method==='POST'){
       const b=await readJson(req);
       results=[];resultIds.clear();fs.writeFileSync(RESULTS_FILE,'');
-      if(b.what==='all'){players.clear();fs.writeFileSync(PLAYERS_FILE,'[]');tour=null;fs.rmSync(TOUR_FILE,{force:true})}
+      if(b.what==='all'){players.clear();fs.writeFileSync(PLAYERS_FILE,'[]');tour=null;fs.rmSync(TOUR_FILE,{force:true});setReg({open:true,closesAt:null})}
       return send(res,200,{ok:true});
     }
   }

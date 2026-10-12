@@ -55,6 +55,7 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid 
 .devices{display:flex;flex-direction:column;gap:8px}
 .dev{display:flex;justify-content:space-between;gap:10px;align-items:center;background:var(--panel2);border-radius:10px;padding:8px 12px}
 .pill{font:700 13px var(--body);letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pill.open{background:var(--go);color:var(--night)} .pill.closed{background:var(--bad);color:#fff}
 .pill.battle{background:var(--go);color:var(--night)} .pill.lobby{background:var(--line);color:var(--ink)}
 .classes{display:flex;flex-direction:column;gap:14px}
 .cls h3{margin:0 0 8px;font:400 15px var(--display);color:var(--teal)}
@@ -134,6 +135,16 @@ tr:first-child td .rank{color:var(--yellow)}
       <div class="row"><button type="button" id="big">Show big</button><button type="button" id="copy">Copy link</button><button type="button" id="editurl">Edit link</button></div>
     </div>
     <div class="stats" id="stats"></div>
+  </section>
+
+  <section class="card">
+    <div class="top"><h2>Registration</h2><span class="pill" id="regpill"></span></div>
+    <p class="muted" id="regtext"></p>
+    <div class="filters">
+      <button type="button" id="regtoggle"></button>
+      <label class="muted" for="regat">Close at</label><input type="time" id="regat">
+      <button type="button" id="regset">Set time</button>
+    </div>
   </section>
 
   <section class="card">
@@ -257,8 +268,23 @@ function render(){
         return `<li class="${onlineKeys.has(p.key)?'on':''}"><span title="${esc(p.name)}">${esc(p.name)}</span><small>${r?r.wins+'–'+r.losses:''}</small></li>`}).join('')||'<li class="muted">—</li>'}</ul></div>`;
     }).join('')}</div></div>`).join(''):'<div class="empty">Nobody has joined yet. Students add themselves in the game’s player picker.</div>';
 
-  drawFilters();drawStandings();drawBattles();drawTour(onlineKeys);
+  drawFilters();drawStandings();drawBattles();drawTour(onlineKeys);drawReg();
 }
+const hm=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+function drawReg(){
+  const r=data.registration,open=r.open&&!(r.closesAt&&data.now>=r.closesAt);
+  $('regpill').className='pill '+(open?'open':'closed');$('regpill').textContent=open?'Open':'Closed';
+  $('regtext').textContent=open?(r.closesAt?`New students can sign up until ${hm(r.closesAt)}. After that only joined students can play.`:'New students can sign up. Close it when everyone has joined (starting the tournament closes it too).')
+    :'Closed: no new students. Joined students sign in by picking their name.';
+  $('regtoggle').textContent=open?'Close now':'Reopen';$('regtoggle').className=open?'danger':'primary';
+}
+async function setReg(open,closesAt){await call('api/admin/registration',{method:'POST',body:JSON.stringify({open,closesAt})});await load()}
+$('regtoggle').onclick=()=>{const r=data.registration,open=r.open&&!(r.closesAt&&data.now>=r.closesAt);setReg(!open,null)};
+$('regset').onclick=()=>{
+  const v=$('regat').value;if(!v){alert('Pick a time first.');return}
+  const [h,m]=v.split(':').map(Number),d=new Date();d.setHours(h,m,0,0);if(d<=new Date())d.setDate(d.getDate()+1);
+  setReg(true,d.getTime());
+};
 function drawTour(onlineKeys){
   const t=data.tournament;
   if(!t){

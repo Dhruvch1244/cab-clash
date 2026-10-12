@@ -371,6 +371,7 @@ let busy=new Set();
 function drawSetup(){
   busy=CC.battling();
   seats=seats.map(p=>p&&busy.has(p.key)?null:p);
+  $('addbox').hidden=!CC.registration().open;
   document.querySelectorAll('.seat').forEach(b=>{
     const i=+b.dataset.seat,p=seats[i];
     b.className='seat'+(i===active?' on':'')+(p?'':' empty');
@@ -429,7 +430,7 @@ CC.onStatus(s=>{
     :s.pending?`${s.online?'Uploading':'Offline'} · ${s.pending} result${s.pending>1?'s':''} saved on this phone, sent when back online`
     :s.online?'Connected to tracker · all results sent':'Offline · results will be saved on this phone';
   const sig=JSON.stringify(CC.roster());
-  const sig2=sig+JSON.stringify([...CC.battling()]);
+  const sig2=sig+JSON.stringify([...CC.battling(),CC.registration()]);
   if(state==='setup'&&sig2!==rosterSig&&!$('q').matches(':focus'))drawSetup();
   rosterSig=sig2;
 });
@@ -470,6 +471,7 @@ halves.forEach((h,i)=>h.addEventListener('pointerdown',e=>{
     alert('This tournament match is already decided or not found. Starting a free battle.');history.replaceState(null,'','duel.html');
   }
   const me=CC.me();
+  if(me&&CC.battling().has(me.key)){alert('You’re already battling on another phone. Finish that battle first.');location.href='./';return}
   try{const s=JSON.parse(sessionStorage.getItem('cc-seats'));const b=CC.battling();if(s&&s[0]&&s[1]&&!s.some(p=>b.has(p.key))){seats=s;applyPlayers();showLock();return}}catch(e){}
   if(me){seats=[CC.roster().find(p=>p.key===me.key)||me,null];active=1}
   showSetup();

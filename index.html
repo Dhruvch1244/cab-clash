@@ -53,6 +53,7 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(46px,16vw,76px);li
 .chip{font:700 19px var(--body);color:var(--ink);background:#232733;border:2px solid var(--line);border-radius:999px;padding:8px 16px;cursor:pointer;flex:1;min-width:58px}
 .chip[aria-pressed="true"]{background:var(--yellow);border-color:var(--yellow);color:var(--night)}
 .btn{font:400 19px var(--display);color:var(--night);background:var(--go,#38d968);border:0;border-radius:14px;padding:16px;cursor:pointer;text-align:center;text-decoration:none;display:block}
+.btn[hidden]{display:none}
 .btn:disabled{background:#2a2f3b;color:var(--dim)}
 .who{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:20px}
 .who b{font-weight:700}
@@ -72,6 +73,12 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(46px,16vw,76px);li
 .tag{font:700 12px var(--body);letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:999px;white-space:nowrap}
 .tag.fight{background:#ff5d5d;color:#fff}.tag.out{background:#2a2f3b;color:var(--dim)}.tag.win{background:var(--yellow);color:var(--night)}
 .note{font-size:16px;color:var(--dim);margin:0}
+.names{display:flex;flex-direction:column;gap:6px;max-height:44vh;overflow-y:auto}
+.names button{font:700 20px var(--body);color:var(--ink);background:var(--night);border:2px solid var(--line);border-radius:12px;padding:10px 12px;text-align:left;display:flex;justify-content:space-between;cursor:pointer}
+.names small{color:var(--dim);font-weight:500}
+#newform{display:flex;flex-direction:column;gap:12px}#newform[hidden],#pickform[hidden]{display:none}
+#pickform{display:flex;flex-direction:column;gap:12px}
+.mode.off{opacity:.4;pointer-events:none}
 .teacher{align-self:center;color:var(--dim);font-size:16px}
 @media (prefers-reduced-motion:reduce){.mode{transition:none}}
 </style>
@@ -86,10 +93,17 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(46px,16vw,76px);li
   </header>
   <section class="card" id="signin" hidden>
     <h2>Sign in</h2>
+    <p class="note" id="regnote"></p>
+    <div id="newform">
     <label for="nm">Your name</label>
     <input id="nm" maxlength="40" autocomplete="name" placeholder="Full name">
     <label>Class</label><div class="chips" id="cls"></div>
     <label>Team</label><div class="chips" id="team"></div>
+    </div>
+    <div id="pickform" hidden>
+      <label>Your class</label><div class="chips" id="pcls"></div>
+      <label>Tap your name</label><div class="names" id="names"></div>
+    </div>
     <p class="err" id="err"></p>
     <button type="button" class="btn" id="go">Let’s go</button>
   </section>
@@ -122,11 +136,26 @@ function chips(el,items,cur,fmt){el.innerHTML=items.map(v=>`<button type="button
 function draw(){
   const me=CC.me();
   $('signin').hidden=!!me;$('mecard').hidden=!me;
-  if(!me){chips($('cls'),CC.CLASSES,cls);chips($('team'),CC.TEAMS,team,t=>'Team '+t);$('tour').hidden=true;return}
+  const reg=CC.registration(),refused=CC.takeRefused();
+  if(refused)$('err').textContent=`Registration had already closed, so “${refused}” wasn’t added. Pick your name below or ask the teacher.`;
+  document.querySelector('.mode.solo').classList.toggle('off',!!me&&CC.battling().has(me.key));
+  if(!me){
+    $('newform').hidden=!reg.open;$('pickform').hidden=reg.open;$('go').hidden=!reg.open;
+    $('regnote').textContent=!reg.open?'Registration is closed. Find your name to sign in.'
+      :reg.closesAt?'Registration closes at '+new Date(reg.closesAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'.':'';
+    chips($('cls'),CC.CLASSES,cls);chips($('team'),CC.TEAMS,team,t=>'Team '+t);
+    if(!reg.open){
+      chips($('pcls'),CC.CLASSES,cls);
+      const list=CC.roster().filter(p=>p.cls===cls).sort((a,b)=>a.name.localeCompare(b.name));
+      $('names').innerHTML=!cls?'<p class="note">Pick your class first.</p>':list.length?list.map(p=>`<button type="button" data-key="${esc(p.key)}"><span>${esc(p.name)}</span><small>Team ${p.team}</small></button>`).join(''):'<p class="note">No students in this class.</p>';
+    }
+    $('tour').hidden=true;return;
+  }
   $('mename').textContent=me.name;$('meinfo').textContent=me.cls+' · Team '+me.team;
   const st=CC.myStatus(),t=$('tour');t.hidden=st.state==='none';
   const who=p=>p?`${esc(p.name)} <span style="color:var(--dim)">(${p.cls} · T${p.team})</span>`:'';
   const busy=CC.battling();
+  if(busy.has(me.key)){t.hidden=false;t.innerHTML=`<small>Busy</small><h2>⚔ You’re battling</h2><p>You’re in a battle on another phone. Finish it there first; until then you can’t start another battle.</p>`;return}
   if(st.state==='match'&&st.opp&&busy.has(st.opp.key))t.innerHTML=`<small>${esc(st.label)}</small><h2>Your match</h2><p class="vs">You vs ${esc(st.opp.name)}</p>
     <p>⚔ ${esc(st.opp.name)} is battling on another phone right now. Wait here; this unlocks when they finish.</p><button type="button" class="btn" disabled>Opponent busy</button>`;
   else if(st.state==='match')t.innerHTML=`<small>${esc(st.label)}</small><h2>Your match</h2><p class="vs">You vs ${esc(st.opp?st.opp.name:'')}</p><p style="color:var(--dim)">${st.opp?st.opp.cls+' · Team '+st.opp.team:''}</p>
@@ -155,16 +184,18 @@ function drawPeople(){
 document.addEventListener('click',e=>{
   const se=e.target.closest('[data-se]');if(se){seTab=se.dataset.se;drawPeople();return}
   const b=e.target.closest('button');if(!b)return;
-  if(b.parentElement.id==='cls'){cls=b.dataset.v;draw()}
+  if(b.parentElement.id==='cls'||b.parentElement.id==='pcls'){cls=b.dataset.v;draw()}
+  else if(b.dataset.key){const p=CC.roster().find(x=>x.key===b.dataset.key);if(p&&confirm(`Sign in as ${p.name} (${p.cls} · Team ${p.team})?`)){CC.signIn(p.name,p.cls,p.team);$('err').textContent='';draw();drawPeople()}}
   else if(b.parentElement.id==='team'){team=b.dataset.v;draw()}
   else if(b.id==='go'){
+    if(!CC.registration().open){draw();return}
     if(!$('nm').value.trim()||!cls||!team){$('err').textContent='Enter your name, then pick your SE and team.';return}
     CC.signIn($('nm').value,cls,team);$('err').textContent='';draw();drawPeople();
   }
   else if(b.id==='out'&&confirm('Sign out of this phone?')){CC.signOut();draw();drawPeople()}
 });
 let sig='';
-CC.onStatus(()=>{const n=JSON.stringify([CC.me(),CC.myStatus(),CC.roster(),[...CC.battling()]]);if(n!==sig){sig=n;draw();drawPeople()}});
+CC.onStatus(()=>{const n=JSON.stringify([CC.me(),CC.myStatus(),CC.roster(),[...CC.battling()],CC.registration()]);if(n!==sig){sig=n;draw();drawPeople()}});
 draw();drawPeople();
 </script>
 <script>if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{})</script>
