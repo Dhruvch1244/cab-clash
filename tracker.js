@@ -63,6 +63,7 @@
       LS.set('cc-outbox',now);
       if(Array.isArray(body.players))mergeRoster(body.players);
       LS.set('cc-tour',body.tournament||null);
+      LS.set('cc-busy',{at:Date.now(),keys:Array.isArray(body.battling)?body.battling:[]});
       online=true;
     }catch(e){online=false}
     busy=false;emit();
@@ -97,6 +98,8 @@
     if(br.champion===u.key)return {state:'champion',label:br.stage+' champion'};
     return {state:'waiting',label};
   }
-  window.CC={CLASSES,TEAMS,roster,addPlayer,recordResult,setPresence,sync,me,signIn,signOut,tournament,findMatch,person,myStatus,
+  // Keys of students battling on another phone, from a sync in the last minute (empty when offline longer).
+  const battling=()=>{const b=LS.get('cc-busy',null);return new Set(b&&b.keys&&Date.now()-b.at<60000?b.keys:[])};
+  window.CC={CLASSES,TEAMS,roster,addPlayer,recordResult,setPresence,sync,me,battling,signIn,signOut,tournament,findMatch,person,myStatus,
     onStatus(f){listeners.push(f);emit()}};
 })();

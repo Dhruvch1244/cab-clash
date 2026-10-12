@@ -178,7 +178,9 @@ async function api(req,res,pathname){
     seated.forEach(p=>upsertPlayer(p,now));
     devices.set(device,{device,status:pr.status==='battle'?'battle':'lobby',players:seated.map(p=>p.key),
       score:Array.isArray(pr.score)?pr.score.slice(0,2).map(n=>Math.trunc(+n)||0):null,seen:now});
-    return send(res,200,{ok:true,accepted,tournament:publicTour(),players:[...players.values()].map(({key,name,cls,team})=>({key,name,cls,team}))});
+    // Students seated on another phone right now, so nobody can pick them for a second battle.
+    const battling=[...new Set([...devices.values()].filter(d=>d.device!==device&&d.status==='battle'&&now-d.seen<ONLINE_MS).flatMap(d=>d.players))];
+    return send(res,200,{ok:true,accepted,battling,tournament:publicTour(),players:[...players.values()].map(({key,name,cls,team})=>({key,name,cls,team}))});
   }
   if(pathname==='/api/players'&&req.method==='GET')
     return send(res,200,{players:[...players.values()].map(({key,name,cls,team})=>({key,name,cls,team}))});

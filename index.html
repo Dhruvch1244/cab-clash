@@ -61,6 +61,17 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(46px,16vw,76px);li
 .tour .vs{font:400 clamp(20px,6vw,26px) var(--display);color:var(--ink)}
 .tour small{font:700 14px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--teal)}
 .err{color:#ff5d5d;margin:0;min-height:1.2em}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.teams{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.team{background:var(--night);border-radius:12px;padding:10px}
+.team h3{margin:0 0 6px;font:700 13px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.team ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:18px}
+.team li{display:flex;justify-content:space-between;gap:6px;align-items:center}
+.team li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.team li.me span{color:var(--yellow);font-weight:700}
+.tag{font:700 12px var(--body);letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.tag.fight{background:#ff5d5d;color:#fff}.tag.out{background:#2a2f3b;color:var(--dim)}.tag.win{background:var(--yellow);color:var(--night)}
+.note{font-size:16px;color:var(--dim);margin:0}
 .teacher{align-self:center;color:var(--dim);font-size:16px}
 @media (prefers-reduced-motion:reduce){.mode{transition:none}}
 </style>
@@ -86,6 +97,12 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(46px,16vw,76px);li
     <div class="who"><span>Hi <b id="mename"></b> · <span id="meinfo"></span></span><button type="button" id="out">Not you?</button></div>
   </section>
   <section class="card tour" id="tour" hidden></section>
+  <section class="card" id="people" hidden>
+    <h2>Students</h2>
+    <div class="tabs" id="setabs"></div>
+    <div class="teams" id="teams"></div>
+    <p class="note">⚔ Battling = on a phone right now, can’t be picked until they finish.</p>
+  </section>
   <nav class="modes">
     <a class="mode solo" href="duel.html">
       <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M6 12h12"/></svg></span>
@@ -109,7 +126,10 @@ function draw(){
   $('mename').textContent=me.name;$('meinfo').textContent=me.cls+' · Team '+me.team;
   const st=CC.myStatus(),t=$('tour');t.hidden=st.state==='none';
   const who=p=>p?`${esc(p.name)} <span style="color:var(--dim)">(${p.cls} · T${p.team})</span>`:'';
-  if(st.state==='match')t.innerHTML=`<small>${esc(st.label)}</small><h2>Your match</h2><p class="vs">You vs ${esc(st.opp?st.opp.name:'')}</p><p style="color:var(--dim)">${st.opp?st.opp.cls+' · Team '+st.opp.team:''}</p>
+  const busy=CC.battling();
+  if(st.state==='match'&&st.opp&&busy.has(st.opp.key))t.innerHTML=`<small>${esc(st.label)}</small><h2>Your match</h2><p class="vs">You vs ${esc(st.opp.name)}</p>
+    <p>⚔ ${esc(st.opp.name)} is battling on another phone right now. Wait here; this unlocks when they finish.</p><button type="button" class="btn" disabled>Opponent busy</button>`;
+  else if(st.state==='match')t.innerHTML=`<small>${esc(st.label)}</small><h2>Your match</h2><p class="vs">You vs ${esc(st.opp?st.opp.name:'')}</p><p style="color:var(--dim)">${st.opp?st.opp.cls+' · Team '+st.opp.team:''}</p>
     <p>Find each other, agree on one phone, and play it there.</p><a class="btn" href="duel.html?match=${encodeURIComponent(st.match.id)}">Play this match</a>`;
   else if(st.state==='waiting')t.innerHTML=`<small>${esc(st.label)}</small><h2>You’re through!</h2><p>Waiting for the other matches to finish. Your next opponent appears here.</p>`;
   else if(st.state==='champion')t.innerHTML=`<small>${esc(st.label)}</small><h2>Class champion 🏆</h2><p>You won your SE. Get ready for the grand final against the other SE champions.</p>`;
@@ -117,19 +137,35 @@ function draw(){
   else if(st.state==='grand')t.innerHTML=`<small>Tournament</small><h2>Grand champion 👑</h2><p>You beat every SE. Take a bow.</p>`;
   else if(st.state==='notin')t.innerHTML=`<small>Tournament</small><h2>Tournament in progress</h2><p>It started before you joined. Play free battles below.</p>`;
 }
+let seTab=null;
+function drawPeople(){
+  const me=CC.me(),roster=CC.roster(),busy=CC.battling(),t=CC.tournament();
+  $('people').hidden=!me;if(!me)return;
+  seTab=seTab||me.cls;
+  const out=new Set(),champ=new Set();
+  if(t){for(const br of [...t.classes,t.final].filter(Boolean)){if(br.champion)champ.add(br.champion);
+    for(const r of br.rounds)for(const m of r)if(m.winner&&m.b)out.add(m.winner===m.a?m.b:m.a)}}
+  $('setabs').innerHTML=CC.CLASSES.map(c=>`<button type="button" class="chip" data-se="${c}" aria-pressed="${c===seTab}">${c} <small>${roster.filter(p=>p.cls===c).length}</small></button>`).join('');
+  $('teams').innerHTML=CC.TEAMS.map(tm=>{
+    const ps=roster.filter(p=>p.cls===seTab&&p.team===tm).sort((a,b)=>a.name.localeCompare(b.name));
+    return `<div class="team"><h3>Team ${tm}</h3><ul>${ps.map(p=>`<li class="${p.key===me.key?'me':''}"><span>${esc(p.name)}</span>${
+      busy.has(p.key)?'<i class="tag fight">⚔ Battling</i>':champ.has(p.key)?'<i class="tag win">🏆</i>':out.has(p.key)?'<i class="tag out">Out</i>':''}</li>`).join('')||'<li class="note">Nobody yet</li>'}</ul></div>`;
+  }).join('');
+}
 document.addEventListener('click',e=>{
+  const se=e.target.closest('[data-se]');if(se){seTab=se.dataset.se;drawPeople();return}
   const b=e.target.closest('button');if(!b)return;
   if(b.parentElement.id==='cls'){cls=b.dataset.v;draw()}
   else if(b.parentElement.id==='team'){team=b.dataset.v;draw()}
   else if(b.id==='go'){
     if(!$('nm').value.trim()||!cls||!team){$('err').textContent='Enter your name, then pick your SE and team.';return}
-    CC.signIn($('nm').value,cls,team);$('err').textContent='';draw();
+    CC.signIn($('nm').value,cls,team);$('err').textContent='';draw();drawPeople();
   }
-  else if(b.id==='out'&&confirm('Sign out of this phone?')){CC.signOut();draw()}
+  else if(b.id==='out'&&confirm('Sign out of this phone?')){CC.signOut();draw();drawPeople()}
 });
 let sig='';
-CC.onStatus(()=>{const n=JSON.stringify([CC.me(),CC.myStatus()]);if(n!==sig){sig=n;draw()}});
-draw();
+CC.onStatus(()=>{const n=JSON.stringify([CC.me(),CC.myStatus(),CC.roster(),[...CC.battling()]]);if(n!==sig){sig=n;draw();drawPeople()}});
+draw();drawPeople();
 </script>
 <script>if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{})</script>
 </body>
