@@ -19,6 +19,9 @@ const players=new Map();   // key -> {key,name,cls,team,joinedAt,lastSeen}
 let results=[];            // [{id,at,receivedAt,device,rounds,winner,players:[{key,name,cls,team,score}]}]
 const resultIds=new Set();
 const devices=new Map();   // device -> {device,status,players:[key],seen}  (memory only)
+const TOUR_FILE=path.join(DATA,'tournament.json');
+let tour=null;             // see startTournament()
+try{tour=JSON.parse(fs.readFileSync(TOUR_FILE,'utf8'))}catch(e){}
 
 try{for(const p of JSON.parse(fs.readFileSync(PLAYERS_FILE,'utf8')))players.set(p.key,p)}catch(e){}
 try{for(const line of fs.readFileSync(RESULTS_FILE,'utf8').split('\n')){
@@ -56,8 +59,66 @@ function result(r,device,now){
   if(ps.includes(null)||ps[0].key===ps[1].key)return null;
   const winner=+r.winner;if(winner!==0&&winner!==1)return null;
   const at=Math.trunc(+r.at);
-  return {id:String(r.id),at:at>0&&at<=now+86400000?at:now,receivedAt:now,device,
+  const match=typeof r.match==='string'&&r.match.length<64?r.match:undefined;
+  return {id:String(r.id),match,at:at>0&&at<=now+86400000?at:now,receivedAt:now,device,
     rounds:Math.max(0,Math.min(999,Math.trunc(+r.rounds)||0)),winner,players:ps};
+}
+
+/* ---------- Tournament: random knockout inside each SE class, then the SE champions play a final ---------- */
+function saveTour(){fs.writeFileSync(TOUR_FILE,JSON.stringify(tour))}
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=crypto.randomInt(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+function makeRound(stage,keys,n){
+  keys=shuffle(keys.slice());const ms=[];
+  for(let i=0;i<keys.length;i+=2){
+    const a=keys[i],b=keys[i+1]||null;
+    ms.push({id:`${stage}-r${n}-m${i/2+1}`,stage,round:n,a,b,winner:b?null:a,score:null});
+  }
+  return ms;
+}
+function newBracket(stage,keys){
+  const br={stage,players:keys.slice(),rounds:[],champion:keys.length===1?keys[0]:null};
+  if(keys.length>1)br.rounds.push(makeRound(stage,keys,1));
+  return br;
+}
+function advanceBracket(br){
+  while(!br.champion&&br.rounds.length){
+    const last=br.rounds[br.rounds.length-1];
+    if(last.some(m=>!m.winner))return;
+    const winners=last.map(m=>m.winner);
+    if(winners.length===1){br.champion=winners[0];return}
+    br.rounds.push(makeRound(br.stage,winners,br.rounds.length+1));
+  }
+}
+function advanceTour(){
+  if(!tour)return;
+  tour.classes.forEach(advanceBracket);
+  if(!tour.final&&tour.classes.every(b=>b.champion)){
+    const champs=tour.classes.map(b=>b.champion);
+    tour.final=newBracket('final',champs);
+  }
+  if(tour.final){advanceBracket(tour.final);if(tour.final.champion&&!tour.champion){tour.champion=tour.final.champion;tour.endedAt=Date.now()}}
+}
+function startTournament(){
+  const byCls=CLASSES.map(c=>[...players.values()].filter(p=>p.cls===c).map(p=>p.key)).map((keys,i)=>({cls:CLASSES[i],keys}));
+  const used=byCls.filter(x=>x.keys.length);
+  if(!used.length)return false;
+  tour={id:crypto.randomUUID(),startedAt:Date.now(),classes:used.map(x=>newBracket(x.cls,x.keys)),final:null,champion:null};
+  advanceTour();saveTour();return true;
+}
+function findMatch(id){
+  if(!tour)return null;
+  for(const br of [...tour.classes,tour.final].filter(Boolean))for(const r of br.rounds)for(const m of r)if(m.id===id)return m;
+  return null;
+}
+function decide(m,winnerKey,score){
+  if(!m||m.winner||!m.b||(winnerKey!==m.a&&winnerKey!==m.b))return false;
+  m.winner=winnerKey;m.score=score||null;advanceTour();saveTour();return true;
+}
+function publicTour(){
+  if(!tour)return null;
+  const ps={};const add=k=>{const p=players.get(k);if(p)ps[k]={name:p.name,cls:p.cls,team:p.team}};
+  for(const br of [...tour.classes,tour.final].filter(Boolean))br.players.forEach(add);
+  return {...tour,people:ps};
 }
 
 /* ---------- HTTP helpers ---------- */
@@ -108,6 +169,8 @@ async function api(req,res,pathname){
       const rec=result(r,device,now);if(!rec)continue;
       rec.players.forEach(p=>upsertPlayer({key:p.key,name:p.name,cls:p.cls,team:p.team},now));
       resultIds.add(rec.id);results.push(rec);fresh.push(JSON.stringify(rec));accepted.push(rec.id);
+      if(rec.match){const m=findMatch(rec.match),keys=rec.players.map(p=>p.key);
+        if(m&&keys.includes(m.a)&&keys.includes(m.b))decide(m,keys[rec.winner],[rec.players.find(p=>p.key===m.a).score,rec.players.find(p=>p.key===m.b).score])}
     }
     if(fresh.length)fs.appendFileSync(RESULTS_FILE,fresh.join('\n')+'\n');
     const pr=b.presence||{};
@@ -115,7 +178,7 @@ async function api(req,res,pathname){
     seated.forEach(p=>upsertPlayer(p,now));
     devices.set(device,{device,status:pr.status==='battle'?'battle':'lobby',players:seated.map(p=>p.key),
       score:Array.isArray(pr.score)?pr.score.slice(0,2).map(n=>Math.trunc(+n)||0):null,seen:now});
-    return send(res,200,{ok:true,accepted,players:[...players.values()].map(({key,name,cls,team})=>({key,name,cls,team}))});
+    return send(res,200,{ok:true,accepted,tournament:publicTour(),players:[...players.values()].map(({key,name,cls,team})=>({key,name,cls,team}))});
   }
   if(pathname==='/api/players'&&req.method==='GET')
     return send(res,200,{players:[...players.values()].map(({key,name,cls,team})=>({key,name,cls,team}))});
@@ -124,13 +187,20 @@ async function api(req,res,pathname){
     if(!isAdmin(req))return send(res,401,{error:'Wrong password'});
     if(pathname==='/api/admin/state'&&req.method==='GET'){
       for(const [k,d] of devices)if(now-d.seen>ONLINE_MS*4)devices.delete(k);
-      return send(res,200,{now,publicUrl:PUBLIC_URL,classes:CLASSES,teams:TEAMS,players:[...players.values()],results,
+      return send(res,200,{now,publicUrl:PUBLIC_URL,classes:CLASSES,teams:TEAMS,players:[...players.values()],results,tournament:publicTour(),
         devices:[...devices.values()].filter(d=>now-d.seen<ONLINE_MS)});
+    }
+    if(pathname==='/api/admin/tournament'&&req.method==='POST'){
+      const b=await readJson(req);
+      if(b.action==='start'){if(!startTournament())return send(res,400,{error:'No students have joined yet'})}
+      else if(b.action==='stop'){tour=null;fs.rmSync(TOUR_FILE,{force:true})}
+      else if(b.action==='winner'){if(!decide(findMatch(b.match),b.winner,null))return send(res,400,{error:'Match already decided'})}
+      return send(res,200,{ok:true,tournament:publicTour()});
     }
     if(pathname==='/api/admin/reset'&&req.method==='POST'){
       const b=await readJson(req);
       results=[];resultIds.clear();fs.writeFileSync(RESULTS_FILE,'');
-      if(b.what==='all'){players.clear();fs.writeFileSync(PLAYERS_FILE,'[]')}
+      if(b.what==='all'){players.clear();fs.writeFileSync(PLAYERS_FILE,'[]');tour=null;fs.rmSync(TOUR_FILE,{force:true})}
       return send(res,200,{ok:true});
     }
   }

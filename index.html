@@ -43,6 +43,24 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(46px,16vw,76px);li
 .mode p{margin:0;font-size:18px;line-height:1.25;color:var(--dim)}
 .mode .go{font-family:var(--display);font-size:22px;color:var(--c)}
 .solo{--c:var(--yellow)}
+.card{background:var(--panel);border:2px solid var(--line);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.card[hidden]{display:none}
+.card h2{font:400 20px var(--display);margin:0;color:var(--yellow)}
+.card label{font:700 13px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.card input{font:500 22px var(--body);color:var(--ink);background:var(--night);border:2px solid var(--line);border-radius:12px;padding:12px;width:100%}
+.card input:focus{outline:none;border-color:var(--yellow)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font:700 19px var(--body);color:var(--ink);background:#232733;border:2px solid var(--line);border-radius:999px;padding:8px 16px;cursor:pointer;flex:1;min-width:58px}
+.chip[aria-pressed="true"]{background:var(--yellow);border-color:var(--yellow);color:var(--night)}
+.btn{font:400 19px var(--display);color:var(--night);background:var(--go,#38d968);border:0;border-radius:14px;padding:16px;cursor:pointer;text-align:center;text-decoration:none;display:block}
+.btn:disabled{background:#2a2f3b;color:var(--dim)}
+.who{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:20px}
+.who b{font-weight:700}
+.who button{font:700 16px var(--body);color:var(--dim);background:none;border:1px solid var(--line);border-radius:8px;padding:4px 10px;cursor:pointer}
+.tour p{margin:0;font-size:20px;line-height:1.3}
+.tour .vs{font:400 clamp(20px,6vw,26px) var(--display);color:var(--ink)}
+.tour small{font:700 14px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--teal)}
+.err{color:#ff5d5d;margin:0;min-height:1.2em}
 .teacher{align-self:center;color:var(--dim);font-size:16px}
 @media (prefers-reduced-motion:reduce){.mode{transition:none}}
 </style>
@@ -55,16 +73,64 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(46px,16vw,76px);li
     <h1>Cab Clash</h1>
     <p class="lede">Over 30 quick-fire games of reflex, maths, words and memory. Two players, one phone, no internet needed.</p>
   </header>
+  <section class="card" id="signin" hidden>
+    <h2>Sign in</h2>
+    <label for="nm">Your name</label>
+    <input id="nm" maxlength="40" autocomplete="name" placeholder="Full name">
+    <label>Class</label><div class="chips" id="cls"></div>
+    <label>Team</label><div class="chips" id="team"></div>
+    <p class="err" id="err"></p>
+    <button type="button" class="btn" id="go">Let’s go</button>
+  </section>
+  <section class="card" id="mecard" hidden>
+    <div class="who"><span>Hi <b id="mename"></b> · <span id="meinfo"></span></span><button type="button" id="out">Not you?</button></div>
+  </section>
+  <section class="card tour" id="tour" hidden></section>
   <nav class="modes">
     <a class="mode solo" href="duel.html">
       <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M6 12h12"/></svg></span>
-      <span><h2>Play</h2><p>2 players. Lay the phone between you, each owns a half.</p></span>
+      <span><h2>Free battle</h2><p>Any 2 players. Lay the phone between you, each owns a half.</p></span>
       <span class="go" aria-hidden="true">›</span>
     </a>
   </nav>
   <div class="checker" aria-hidden="true"></div>
   <a class="teacher" href="admin.html">Teacher tracker</a>
 </main>
+<script src="tracker.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let cls=null,team=null;
+function chips(el,items,cur,fmt){el.innerHTML=items.map(v=>`<button type="button" class="chip" data-v="${v}" aria-pressed="${v===cur}">${fmt?fmt(v):v}</button>`).join('')}
+function draw(){
+  const me=CC.me();
+  $('signin').hidden=!!me;$('mecard').hidden=!me;
+  if(!me){chips($('cls'),CC.CLASSES,cls);chips($('team'),CC.TEAMS,team,t=>'Team '+t);$('tour').hidden=true;return}
+  $('mename').textContent=me.name;$('meinfo').textContent=me.cls+' · Team '+me.team;
+  const st=CC.myStatus(),t=$('tour');t.hidden=st.state==='none';
+  const who=p=>p?`${esc(p.name)} <span style="color:var(--dim)">(${p.cls} · T${p.team})</span>`:'';
+  if(st.state==='match')t.innerHTML=`<small>${esc(st.label)}</small><h2>Your match</h2><p class="vs">You vs ${esc(st.opp?st.opp.name:'')}</p><p style="color:var(--dim)">${st.opp?st.opp.cls+' · Team '+st.opp.team:''}</p>
+    <p>Find each other, agree on one phone, and play it there.</p><a class="btn" href="duel.html?match=${encodeURIComponent(st.match.id)}">Play this match</a>`;
+  else if(st.state==='waiting')t.innerHTML=`<small>${esc(st.label)}</small><h2>You’re through!</h2><p>Waiting for the other matches to finish. Your next opponent appears here.</p>`;
+  else if(st.state==='champion')t.innerHTML=`<small>${esc(st.label)}</small><h2>Class champion 🏆</h2><p>You won your SE. Get ready for the grand final against the other SE champions.</p>`;
+  else if(st.state==='out')t.innerHTML=`<small>${esc(st.label)}</small><h2>Knocked out</h2><p>Good game! You can still play free battles below.</p>`;
+  else if(st.state==='grand')t.innerHTML=`<small>Tournament</small><h2>Grand champion 👑</h2><p>You beat every SE. Take a bow.</p>`;
+  else if(st.state==='notin')t.innerHTML=`<small>Tournament</small><h2>Tournament in progress</h2><p>It started before you joined. Play free battles below.</p>`;
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.parentElement.id==='cls'){cls=b.dataset.v;draw()}
+  else if(b.parentElement.id==='team'){team=b.dataset.v;draw()}
+  else if(b.id==='go'){
+    if(!$('nm').value.trim()||!cls||!team){$('err').textContent='Enter your name, then pick your SE and team.';return}
+    CC.signIn($('nm').value,cls,team);$('err').textContent='';draw();
+  }
+  else if(b.id==='out'&&confirm('Sign out of this phone?')){CC.signOut();draw()}
+});
+let sig='';
+CC.onStatus(()=>{const n=JSON.stringify([CC.me(),CC.myStatus()]);if(n!==sig){sig=n;draw()}});
+draw();
+</script>
 <script>if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{})</script>
 </body>
 </html>

@@ -16,6 +16,16 @@ Forked from [vickky1802/cab-clash](https://github.com/vickky1802/cab-clash); the
 
 After the first visit the game loads and plays with no connection; queued results upload when the phone is back online.
 
+## Tournament
+
+1. Each student opens the game once and **signs in**: name, SE class, team (saved on their phone).
+2. The teacher presses **Start tournament** on the admin screen. Everyone who has joined is drawn at random
+   into a knockout **inside their own SE** (odd numbers get a bye).
+3. Each student's phone shows **Your match: You vs X**. The two find each other, agree on one phone, and tap
+   **Play this match**. The winner advances automatically; the next round is drawn when the round finishes.
+4. When every SE has a champion, the **grand final** (a knockout between the SE champions) is drawn automatically.
+5. The admin screen shows every bracket live, and can award a walkover if a student is absent.
+
 ## Admin screen
 
 `http://<server>:9000/admin` — password `cd2026` (change with `ADMIN_PASSWORD`).

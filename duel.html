@@ -165,7 +165,7 @@ details.add label{font:700 13px var(--body);letter-spacing:.14em;text-transform:
 <script src="games.js"></script>
 <script>
 const TARGET=5;
-let P=['Teal','Yellow'],seats=[null,null];
+let P=['Teal','Yellow'],seats=[null,null],matchId=null,matchLabel='';
 const halves=[document.getElementById('p0'),document.getElementById('p1')];
 let score=[0,0],round=0,state='menu',ready=[false,false],game=null,g={},timers=[],bag=[],lastGame=null;
 
@@ -274,7 +274,7 @@ function finishClock(){
 function menu(){
   clearTimers();state='menu';ready=[false,false];score=[0,0];round=0;bag=[];lastGame=null;strip('First to 5');
   CC.setPresence('lobby',seats);
-  document.getElementById('mid').innerHTML='First to 5<br><button type="button" id="pick">Players</button> <button type="button" data-sfx-toggle>'+SFX.label()+'</button>';
+  document.getElementById('mid').innerHTML=(matchId?esc(matchLabel):'First to 5')+'<br>'+(matchId?'<a href="./">‹ Home</a>':'<button type="button" id="pick">Players</button>')+' <button type="button" data-sfx-toggle>'+SFX.label()+'</button>';
   both(i=>set(i,`<div class="who">${P[i]}</div><div class="big">Tap to ready</div><div class="rule">Hold the phone flat between you. The half facing you is yours.</div>`,'idle'));
 }
 function pickGame(){
@@ -304,11 +304,11 @@ function award(w,note,loseMsg){
 }
 function finale(){
   state='over';const w=score[0]>score[1]?0:1;SFX.play('fanfare');strip('Final '+score[0]+' – '+score[1]);
-  CC.recordResult(seats,score,w,round);CC.setPresence('lobby',seats);
+  CC.recordResult(seats,score,w,round,matchId);const wasMatch=matchId;matchId=null;CC.setPresence('lobby',seats);
   const s=seats[w];
-  set(w,`<div class="who">Final winner</div><div class="big">${P[w]}</div><div class="rule">${s.cls} · Team ${s.team}</div><div class="rule">Final score ${score[w]} – ${score[1-w]} · result saved</div>`,'win');
+  set(w,`<div class="who">Final winner</div><div class="big">${P[w]}</div><div class="rule">${s.cls} · Team ${s.team}</div><div class="rule">Final score ${score[w]} – ${score[1-w]} · ${wasMatch?'advances in the tournament':'result saved'}</div>`,'win');
   set(1-w,`<div class="who">${P[1-w]}</div><div class="big">Snacks are on you</div><div class="rule">Final score ${score[1-w]} – ${score[w]}</div>`,'lose');
-  later(()=>{state='rematch';both(i=>halves[i].querySelector('.panel').insertAdjacentHTML('beforeend','<div class="rule"><b>Tap for a rematch</b></div>'))},1400);
+  later(()=>{state=wasMatch?'home':'rematch';both(i=>halves[i].querySelector('.panel').insertAdjacentHTML('beforeend',`<div class="rule"><b>${wasMatch?'Tap to go home':'Tap for a rematch'}</b></div>`))},1400);
 }
 function handle(i,a){
   if(state==='menu'){
@@ -317,6 +317,7 @@ function handle(i,a){
     if(ready[0]&&ready[1]){state='starting';SFX.play('honk');later(nextRound,800)}
   }else if(state==='play'){game.tap(i,a)}
   else if(state==='rematch'){menu()}
+  else if(state==='home'){location.href='./'}
 }
 /* ---------- Player picker ---------- */
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -355,7 +356,7 @@ function showSetup(){clearTimers();state='setup';CC.setPresence('lobby',seats);$
 function applyPlayers(){
   P=seats.map(p=>esc(p.name));
   $('l0').textContent=seats[0].name;$('l1').textContent=seats[1].name;
-  try{sessionStorage.setItem('cc-seats',JSON.stringify(seats))}catch(e){}
+  if(!matchId)try{sessionStorage.setItem('cc-seats',JSON.stringify(seats))}catch(e){}
 }
 $('setup').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
@@ -394,7 +395,22 @@ CC.onStatus(s=>{
 halves.forEach((h,i)=>h.addEventListener('pointerdown',e=>{
   e.preventDefault();const b=e.target.closest('[data-a]');handle(i,b?b.dataset.a:null);
 }));
-try{const s=JSON.parse(sessionStorage.getItem('cc-seats'));if(s&&s[0]&&s[1]){seats=s;applyPlayers();menu()}else showSetup()}catch(e){showSetup()}
+(function boot(){
+  const id=new URLSearchParams(location.search).get('match');
+  if(id){
+    const f=CC.findMatch(id);
+    if(f&&!f.m.winner&&f.m.b){
+      seats=[CC.person(f.t,f.m.a),CC.person(f.t,f.m.b)];matchId=id;
+      matchLabel=(f.m.stage==='final'?'Grand final':f.m.stage)+' · Round '+f.m.round;
+      applyPlayers();menu();return;
+    }
+    alert('This tournament match is already decided or not found. Starting a free battle.');history.replaceState(null,'','duel.html');
+  }
+  const me=CC.me();
+  try{const s=JSON.parse(sessionStorage.getItem('cc-seats'));if(s&&s[0]&&s[1]){seats=s;applyPlayers();menu();return}}catch(e){}
+  if(me){seats=[CC.roster().find(p=>p.key===me.key)||me,null];active=1}
+  showSetup();
+})();
 </script>
 
 <script>if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{})</script>

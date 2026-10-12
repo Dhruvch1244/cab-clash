@@ -34,9 +34,9 @@
     const o=outbox();o.joins=o.joins.filter(j=>j.key!==p.key).concat(p);LS.set('cc-outbox',o);
     sync();return p;
   }
-  function recordResult(seats,score,winner,rounds){
+  function recordResult(seats,score,winner,rounds,match){
     const o=outbox();
-    o.results.push({id:uid(),at:Date.now(),rounds,winner,
+    o.results.push({id:uid(),match:match||undefined,at:Date.now(),rounds,winner,
       players:seats.map((p,i)=>({name:p.name,cls:p.cls,team:p.team,score:score[i]}))});
     LS.set('cc-outbox',o);emit();sync();
   }
@@ -62,6 +62,7 @@
       now.results=now.results.filter(r=>!ok.has(r.id));
       LS.set('cc-outbox',now);
       if(Array.isArray(body.players))mergeRoster(body.players);
+      LS.set('cc-tour',body.tournament||null);
       online=true;
     }catch(e){online=false}
     busy=false;emit();
@@ -73,6 +74,29 @@
     setInterval(sync,15000);
     sync();
   }
-  window.CC={CLASSES,TEAMS,roster,addPlayer,recordResult,setPresence,sync,
+  /* Signed-in student on this phone, and where they stand in the tournament. */
+  const me=()=>LS.get('cc-me',null);
+  function signIn(name,cls,team){const p=addPlayer(name,cls,team);if(p)LS.set('cc-me',p);return p}
+  const signOut=()=>LS.set('cc-me',null);
+  const tournament=()=>LS.get('cc-tour',null);
+  const brackets=t=>[...t.classes,t.final].filter(Boolean);
+  function person(t,k){const p=t&&t.people[k];return p?{key:k,...p}:null}
+  function findMatch(id){const t=tournament();if(!t)return null;
+    for(const br of brackets(t))for(const r of br.rounds)for(const m of r)if(m.id===id)return {m,t};return null}
+  // -> {state:'none'|'match'|'waiting'|'out'|'champion'|'grand'|'notin', match?, opp?, label?}
+  function myStatus(){
+    const t=tournament(),u=me();if(!t||!u)return {state:'none'};
+    if(t.champion===u.key)return {state:'grand'};
+    const mine=brackets(t).filter(b=>b.players.includes(u.key));
+    if(!mine.length)return {state:'notin'};
+    const br=mine[mine.length-1],label=br.stage==='final'?'Grand final':br.stage+' knockout';
+    for(const r of br.rounds)for(const m of r)
+      if(!m.winner&&(m.a===u.key||m.b===u.key))return {state:'match',match:m,label:`${label} · Round ${m.round}`,opp:person(t,m.a===u.key?m.b:m.a),me:person(t,u.key)};
+    const lost=br.rounds.some(r=>r.some(m=>m.winner&&m.winner!==u.key&&(m.a===u.key||m.b===u.key)));
+    if(lost)return {state:'out',label};
+    if(br.champion===u.key)return {state:'champion',label:br.stage+' champion'};
+    return {state:'waiting',label};
+  }
+  window.CC={CLASSES,TEAMS,roster,addPlayer,recordResult,setPresence,sync,me,signIn,signOut,tournament,findMatch,person,myStatus,
     onStatus(f){listeners.push(f);emit()}};
 })();

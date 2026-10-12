@@ -1,7 +1,7 @@
 /* Offline cache: every file the game needs is stored on first visit, then served from the
    cache so the game runs with no connection. Cached files refresh in the background when the
    server is reachable. Tracker calls (/api/) and the admin screen always go to the network. */
-const VERSION='cab-clash-v2';
+const VERSION='cab-clash-v3';
 const FILES=['./','index.html','duel.html','games.js','sfx.js','tracker.js','icon.svg','manifest.webmanifest',
   'fonts/fonts.css','fonts/rubik-mono-one.woff2','fonts/barlow-condensed-500.woff2','fonts/barlow-condensed-700.woff2'];
 

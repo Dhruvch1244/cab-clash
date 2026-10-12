@@ -87,6 +87,22 @@ tr:first-child td .rank{color:var(--yellow)}
 #bigqr .code{width:min(78vh,88vw);aspect-ratio:1}
 #bigqr .code svg{width:100%;height:100%}
 #bigqr p{font:400 clamp(18px,3.4vw,34px) var(--display);margin:0;text-align:center;overflow-wrap:anywhere}
+/* Tournament brackets */
+.brackets{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:12px}
+.br{background:var(--panel2);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.br.final{grid-column:1/-1;border:2px solid var(--yellow)}
+.br h3{margin:0;font:400 15px var(--display);color:var(--teal);display:flex;justify-content:space-between;gap:8px}
+.br.final h3{color:var(--yellow)}
+.br h4{margin:4px 0 0;font:700 12px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.m{display:flex;flex-direction:column;gap:2px;background:var(--night);border-radius:8px;padding:6px 8px;font-size:16px}
+.m .p{display:flex;justify-content:space-between;gap:6px;align-items:center}
+.m .p span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m .p.win{color:var(--go);font-weight:700}
+.m .p.lose{color:var(--dim);text-decoration:line-through}
+.m button{font-size:13px;padding:1px 8px;border-width:1px}
+.m.live{outline:2px solid var(--go)}
+.crown{background:linear-gradient(120deg,#2b2410,var(--panel2));border:2px solid var(--yellow);border-radius:12px;padding:14px;text-align:center}
+.crown b{display:block;font:400 clamp(22px,4vw,34px) var(--display);color:var(--yellow)}
 @media (max-width:720px){.hero{grid-template-columns:1fr}.teams{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (prefers-reduced-motion:reduce){.live i{animation:none}}
 </style>
@@ -118,6 +134,11 @@ tr:first-child td .rank{color:var(--yellow)}
       <div class="row"><button type="button" id="big">Show big</button><button type="button" id="copy">Copy link</button><button type="button" id="editurl">Edit link</button></div>
     </div>
     <div class="stats" id="stats"></div>
+  </section>
+
+  <section class="card">
+    <div class="top"><h2>Tournament</h2><div class="filters" id="tourbtns"></div></div>
+    <div id="tour"></div>
   </section>
 
   <div class="cols">
@@ -236,8 +257,43 @@ function render(){
         return `<li class="${onlineKeys.has(p.key)?'on':''}"><span title="${esc(p.name)}">${esc(p.name)}</span><small>${r?r.wins+'–'+r.losses:''}</small></li>`}).join('')||'<li class="muted">—</li>'}</ul></div>`;
     }).join('')}</div></div>`).join(''):'<div class="empty">Nobody has joined yet. Students add themselves in the game’s player picker.</div>';
 
-  drawFilters();drawStandings();drawBattles();
+  drawFilters();drawStandings();drawBattles();drawTour(onlineKeys);
 }
+function drawTour(onlineKeys){
+  const t=data.tournament;
+  if(!t){
+    const counts=data.classes.map(c=>`${c}: ${data.players.filter(p=>p.cls===c).length}`).join(' · ');
+    $('tourbtns').innerHTML='<button type="button" class="primary" data-tour="start">Start tournament</button>';
+    $('tour').innerHTML=`<p class="muted">Random knockout inside each SE using everyone who has joined (${esc(counts)}). Each SE’s champion then plays a knockout grand final. Students see their next match on their phone.</p>`;
+    return;
+  }
+  $('tourbtns').innerHTML='<button type="button" data-tour="start">Restart with everyone joined</button><button type="button" class="danger" data-tour="stop">Stop tournament</button>';
+  const name=k=>{const p=t.people[k];return p?`${esc(p.name)} <span class="muted">${p.cls}·T${p.team}</span>`:esc(k)};
+  const live=new Set(data.devices.filter(d=>d.status==='battle').map(d=>d.players.slice().sort().join('|')));
+  const match=m=>{
+    if(!m.b)return `<div class="m"><div class="p win"><span>${name(m.a)}</span><small>bye</small></div></div>`;
+    const row=(k,i)=>`<div class="p ${m.winner?(m.winner===k?'win':'lose'):''}"><span>${name(k)}</span>${
+      m.winner?(m.score?`<small>${m.score[i]}</small>`:'<small>w/o</small>'):`<button type="button" data-win="${esc(k)}" data-match="${esc(m.id)}" title="Award the win (walkover)">Win</button>`}</div>`;
+    return `<div class="m${!m.winner&&live.has([m.a,m.b].sort().join('|'))?' live':''}">${row(m.a,0)}${row(m.b,1)}</div>`;
+  };
+  const bracket=(br,cls)=>`<div class="br ${cls||''}"><h3><span>${br.stage==='final'?'Grand final':br.stage}</span><span>${br.champion?'🏆 '+name(br.champion):br.players.length+' players'}</span></h3>${
+    br.rounds.map((r,i)=>`<h4>Round ${i+1}</h4>${r.map(match).join('')}`).join('')}</div>`;
+  const waiting=t.classes.filter(b=>!b.champion).map(b=>b.stage);
+  $('tour').innerHTML=(t.champion?`<div class="crown"><span class="muted">Grand champion</span><b>${esc(t.people[t.champion].name)}</b><span>${t.people[t.champion].cls} · Team ${t.people[t.champion].team}</span></div>`:'')+
+    (!t.final?`<p class="muted">Grand final starts automatically when every SE has a champion. Still playing: ${waiting.join(', ')}.</p>`:'')+
+    `<div class="brackets">${t.final?bracket(t.final,'final'):''}${t.classes.map(b=>bracket(b)).join('')}</div>`;
+}
+$('tourbtns').addEventListener('click',async e=>{
+  const a=e.target.closest('[data-tour]');if(!a)return;
+  if(a.dataset.tour==='start'&&data.tournament&&!confirm('Restart the tournament with new random pairings? Current brackets are lost.'))return;
+  if(a.dataset.tour==='stop'&&!confirm('Stop and delete the tournament? Battle results stay.'))return;
+  try{await call('api/admin/tournament',{method:'POST',body:JSON.stringify({action:a.dataset.tour})});await load()}catch(err){alert('Could not do that: '+err.message)}
+});
+$('tour').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-win]');if(!b)return;
+  if(!confirm('Award this match to the selected player (e.g. opponent absent)?'))return;
+  try{await call('api/admin/tournament',{method:'POST',body:JSON.stringify({action:'winner',match:b.dataset.match,winner:b.dataset.win})});await load()}catch(err){alert('Could not do that.')}
+});
 function drawQR(){
   const url=L.get('cc-qr-url')||data.publicUrl||new URL('./',location.href).href;
   if(url===qrFor)return;qrFor=url;
