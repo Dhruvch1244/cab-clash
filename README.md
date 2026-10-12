@@ -42,7 +42,7 @@ git clone https://github.com/Dhruvch1244/cab-clash && cd cab-clash
 sudo ./deploy/setup.sh                 # installs Node if needed, runs on port 9000 as a service, prints links
 ```
 
-Then open inbound TCP 9000 in the instance's security group. Re-run `sudo ./deploy/setup.sh` after `git pull` to update;
+The script also opens port 9000 in the host firewall and in the EC2 security group (when the instance has an IAM role allowed `ec2:AuthorizeSecurityGroupIngress`; otherwise it prints the exact fix). Re-run `sudo ./deploy/setup.sh` after `git pull` to update;
 data in `/var/lib/cab-clash` is kept. Options: `sudo PORT=9000 ADMIN_PASSWORD=cd2026 ./deploy/setup.sh`.
 
 To create a brand-new instance instead, with the AWS CLI configured:
