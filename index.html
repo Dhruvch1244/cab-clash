@@ -4,20 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#13151b">
-<meta name="description" content="Quick-fire mini-games for bored passengers. Play on one phone or everyone on their own.">
+<meta name="description" content="Quick-fire mini-games for bored passengers. Two players, one phone, no internet needed.">
 <title>Cab Clash</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'%3E%3Crect width='4' height='4' fill='%2313151b'/%3E%3Cpath d='M0 0h1v1H0zM2 0h1v1H2zM1 1h1v1H1zM3 1h1v1H3zM0 2h1v1H0zM2 2h1v1H2zM1 3h1v1H1zM3 3h1v1H3z' fill='%23f6c432'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Barlow+Condensed:wght@500;700&display=swap">
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="manifest" href="manifest.webmanifest">
 <style>
-/* Layout: a taxi roof sign up top, then two mode tickets stacked like fare cards. */
+/* Layout: a taxi roof sign up top, then the mode ticket styled like a fare card. */
 :root{
   --night:#13151b;
   --panel:#1c1f28;
   --ink:#f3efe4;
   --dim:#8a8f9e;
   --yellow:#f6c432;
-  --teal:#2fd4c4;
   --line:#3a4050;
   --display:"Rubik Mono One","Arial Black",system-ui,sans-serif;
   --body:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
@@ -43,7 +42,7 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(46px,16vw,76px);li
 .mode h2{font-family:var(--display);font-weight:400;font-size:20px;margin:0 0 4px;letter-spacing:.02em}
 .mode p{margin:0;font-size:18px;line-height:1.25;color:var(--dim)}
 .mode .go{font-family:var(--display);font-size:22px;color:var(--c)}
-.solo{--c:var(--yellow)} .party{--c:var(--teal)}
+.solo{--c:var(--yellow)}
 @media (prefers-reduced-motion:reduce){.mode{transition:none}}
 </style>
 </head>
@@ -53,21 +52,17 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(46px,16vw,76px);li
   <header class="sign">
     <small>Back-seat mini-games</small>
     <h1>Cab Clash</h1>
-    <p class="lede">Over 30 quick-fire games of reflex, maths, words and memory. Pick how you’re playing.</p>
+    <p class="lede">Over 30 quick-fire games of reflex, maths, words and memory. Two players, one phone, no internet needed.</p>
   </header>
   <nav class="modes">
     <a class="mode solo" href="duel.html">
       <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M6 12h12"/></svg></span>
-      <span><h2>One phone</h2><p>2 players. Lay the phone between you, each owns a half.</p></span>
-      <span class="go" aria-hidden="true">›</span>
-    </a>
-    <a class="mode party" href="party.html">
-      <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="2.5" y="5" width="8" height="14" rx="2"/><rect x="13.5" y="5" width="8" height="14" rx="2"/><path d="M10.5 12h3"/></svg></span>
-      <span><h2>Party</h2><p>2–8 players, each on their own phone. Create a party and share the code.</p></span>
+      <span><h2>Play</h2><p>2 players. Lay the phone between you, each owns a half.</p></span>
       <span class="go" aria-hidden="true">›</span>
     </a>
   </nav>
   <div class="checker" aria-hidden="true"></div>
 </main>
+<script>if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{})</script>
 </body>
 </html>

@@ -1,16 +1,15 @@
-# Cab Clash
+# Cab Clash (offline)
 
-Quick-fire mini-games for bored passengers, playable in any phone browser.
+Quick-fire mini-games for bored passengers, played in person on one phone. No internet, no accounts, no servers.
 
-- **One phone** (`duel.html`): 2 players share one phone, each owns half the screen. First to 5 wins.
-- **Party** (`party.html`): 2–8 players, each on their own phone. One person creates a party and shares the 4-character code or link; everyone plays the same mini-game at the same moment and scores by rank.
+- 2 players share one phone, each owns half the screen. First to 5 wins.
+- 31 mini-games (reflex, maths, words, memory and trivia).
 
-31 mini-games (reflex, maths, words, memory and trivia). Party hosts can pick 5–30 rounds and remove players.
+Forked from [vickky1802/cab-clash](https://github.com/vickky1802/cab-clash) with the online party mode removed and everything bundled locally.
 
-## How party mode works
+## Playing offline
 
-Plain static files, no backend of its own. Phones exchange small JSON messages through three free public MQTT brokers at once (EMQX, HiveMQ and Mosquitto, over secure WebSockets); each phone uses whichever brokers it can reach, so one being down or blocked doesn't stop the game. The host's phone referees the match, so the host must keep the page open. Party codes are not secret: anyone with the code can join.
+Everything the game needs (pages, scripts, fonts) is in this folder; nothing is loaded from the internet.
 
-## Run locally
-
-Open `index.html` in a browser, or serve the folder: `python3 -m http.server`.
+- **From a website (e.g. GitHub Pages):** open it once while online. A service worker saves every file, so afterwards it loads with no connection. Use "Add to Home Screen" to get an app icon.
+- **From the files:** copy the folder to the device and open `index.html`, or serve it locally: `python3 -m http.server`.

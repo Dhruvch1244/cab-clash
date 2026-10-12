@@ -1,0 +1,12 @@
+{
+  "name": "Cab Clash",
+  "short_name": "Cab Clash",
+  "description": "Quick-fire two-player mini-games on one phone. Works offline.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#13151b",
+  "theme_color": "#13151b",
+  "icons": [{"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}]
+}

@@ -1,4 +1,4 @@
-/* Cab Clash question games, shared by one-phone and party modes.
+/* Cab Clash question games, used by one-phone mode.
    Each gen() returns {prompt, opts, answer, cls?, note}. opts are strings or {v, l}. */
 (function(){
   let R=Math.random;
