@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#13151b">
+<meta name="robots" content="noindex">
+<title>Cab Clash Tracker</title>
+<link rel="icon" href="icon.svg">
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>
+/* Layout: a teacher's dashboard. QR + headline numbers up top, then lobby, standings and the battle log. */
+:root{
+  --night:#13151b;--panel:#1c1f28;--panel2:#232733;--ink:#f3efe4;--dim:#8a8f9e;--line:#3a4050;
+  --yellow:#f6c432;--teal:#2fd4c4;--go:#38d968;--bad:#ff5d5d;
+  --display:"Rubik Mono One","Arial Black",system-ui,sans-serif;
+  --body:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--night);color:var(--ink);font:500 18px/1.3 var(--body);
+  padding:calc(env(safe-area-inset-top,0px) + 20px) 16px calc(env(safe-area-inset-bottom,0px) + 40px)}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.checker{height:10px;background:repeating-conic-gradient(var(--yellow) 0 25%,var(--night) 0 50%) 0 0/10px 10px;border-radius:2px}
+h1{font:400 clamp(24px,5vw,36px) var(--display);color:var(--yellow);margin:0}
+h2{font:400 17px var(--display);letter-spacing:.03em;margin:0}
+.muted{color:var(--dim)}
+button,select,input{font:700 17px var(--body);color:var(--ink);background:var(--panel2);border:2px solid var(--line);border-radius:10px;padding:7px 12px}
+button{cursor:pointer}
+button:hover,select:hover{border-color:var(--dim)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--yellow);outline-offset:1px}
+.primary{background:var(--yellow);border-color:var(--yellow);color:var(--night)}
+.danger{color:var(--bad)}
+.card{background:var(--panel);border:2px solid #2a2f3b;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.live{display:inline-flex;align-items:center;gap:8px;font-weight:700;color:var(--dim)}
+.live i{width:10px;height:10px;border-radius:50%;background:var(--go);box-shadow:0 0 0 0 var(--go);animation:pulse 2s infinite}
+.live.err i{background:var(--bad);animation:none}
+@keyframes pulse{70%{box-shadow:0 0 0 8px transparent}}
+.hero{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:18px}
+.qr{align-items:center;text-align:center}
+.qr .code{background:#fff;border-radius:12px;padding:10px;width:100%;max-width:260px;aspect-ratio:1}
+.qr .code svg{width:100%;height:100%;display:block}
+.qr .url{font:700 17px var(--body);overflow-wrap:anywhere}
+.qr .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-content:start}
+.stat{background:var(--panel2);border-radius:12px;padding:12px 14px}
+.stat b{display:block;font:400 clamp(28px,4vw,40px) var(--display);font-variant-numeric:tabular-nums}
+.stat span{font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:13px;color:var(--dim)}
+.champ{grid-column:1/-1;background:linear-gradient(120deg,#2b2410,var(--panel2));border:2px solid var(--yellow)}
+.champ b{font-size:clamp(22px,3.4vw,30px);color:var(--yellow);overflow-wrap:anywhere}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:18px}
+.devices{display:flex;flex-direction:column;gap:8px}
+.dev{display:flex;justify-content:space-between;gap:10px;align-items:center;background:var(--panel2);border-radius:10px;padding:8px 12px}
+.pill{font:700 13px var(--body);letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pill.battle{background:var(--go);color:var(--night)} .pill.lobby{background:var(--line);color:var(--ink)}
+.classes{display:flex;flex-direction:column;gap:14px}
+.cls h3{margin:0 0 8px;font:400 15px var(--display);color:var(--teal)}
+.teams{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.team{background:var(--panel2);border-radius:10px;padding:8px 10px;min-height:62px}
+.team h4{margin:0 0 4px;font:700 13px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.team ul{list-style:none;margin:0;padding:0;font-size:16px}
+.team li{display:flex;justify-content:space-between;gap:6px}
+.team li.on::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--go);align-self:center;margin-right:-2px}
+.team li span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.team li small{color:var(--dim);font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto;margin:0 -4px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid #2a2f3b;white-space:nowrap}
+th{font:700 13px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+td.n,th.n{text-align:right}
+tr:first-child td .rank{color:var(--yellow)}
+.rank{font-family:var(--display);font-size:15px;color:var(--dim)}
+.w{color:var(--go);font-weight:700} .l{color:var(--dim)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.empty{color:var(--dim);padding:6px 2px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button[aria-selected="true"]{background:var(--yellow);border-color:var(--yellow);color:var(--night)}
+#login{max-width:380px;margin:12vh auto 0;text-align:center}
+#login form{display:flex;flex-direction:column;gap:12px}
+#login input{font-size:22px;padding:12px;text-align:center}
+#err{color:var(--bad);min-height:1.3em;margin:0}
+#bigqr{position:fixed;inset:0;z-index:10;background:#fff;color:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;cursor:zoom-out;padding:20px}
+#bigqr[hidden]{display:none}
+#bigqr .code{width:min(78vh,88vw);aspect-ratio:1}
+#bigqr .code svg{width:100%;height:100%}
+#bigqr p{font:400 clamp(18px,3.4vw,34px) var(--display);margin:0;text-align:center;overflow-wrap:anywhere}
+@media (max-width:720px){.hero{grid-template-columns:1fr}.teams{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (prefers-reduced-motion:reduce){.live i{animation:none}}
+</style>
+</head>
+<body>
+
+<section id="login" class="card" hidden>
+  <h1>Tracker</h1>
+  <p class="muted">Teacher access only.</p>
+  <form id="loginf">
+    <input id="pw" type="password" placeholder="Password" autocomplete="current-password" aria-label="Password" required>
+    <button class="primary" type="submit">Open dashboard</button>
+    <p id="err" role="alert"></p>
+  </form>
+</section>
+
+<main class="wrap" id="dash" hidden>
+  <div class="checker" aria-hidden="true"></div>
+  <header class="top">
+    <h1>Cab Clash Tracker</h1>
+    <div class="filters"><span class="live" id="live"><i></i><span>Connecting…</span></span><button type="button" id="logout">Log out</button></div>
+  </header>
+
+  <section class="hero">
+    <div class="card qr">
+      <h2>Scan to play</h2>
+      <div class="code" id="qr"></div>
+      <div class="url" id="url"></div>
+      <div class="row"><button type="button" id="big">Show big</button><button type="button" id="copy">Copy link</button><button type="button" id="editurl">Edit link</button></div>
+    </div>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <div class="cols">
+    <section class="card">
+      <div class="top"><h2>Lobby: online now</h2><span class="muted" id="devcount"></span></div>
+      <div class="devices" id="devices"></div>
+    </section>
+    <section class="card">
+      <div class="top"><h2>Joined students</h2><span class="muted" id="joincount"></span></div>
+      <div class="classes" id="joined"></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="top">
+      <h2>Standings</h2>
+      <div class="tabs" role="tablist" id="tabs">
+        <button type="button" role="tab" data-t="students" aria-selected="true">Students</button>
+        <button type="button" role="tab" data-t="teams" aria-selected="false">Teams</button>
+        <button type="button" role="tab" data-t="classes" aria-selected="false">Classes</button>
+      </div>
+    </div>
+    <div class="filters"><select id="fcls" aria-label="Class filter"></select><select id="fteam" aria-label="Team filter"></select></div>
+    <div class="tablewrap" id="standings"></div>
+  </section>
+
+  <section class="card">
+    <div class="top"><h2>Battle results</h2><div class="filters"><button type="button" id="csv">Download CSV</button></div></div>
+    <div class="tablewrap" id="battles"></div>
+  </section>
+
+  <section class="card">
+    <h2>Reset</h2>
+    <p class="muted">Start a fresh session. This can’t be undone, so download the CSV first.</p>
+    <div class="filters"><button type="button" class="danger" id="resetr">Clear battle results</button><button type="button" class="danger" id="reseta">Clear results and students</button></div>
+  </section>
+  <div class="checker" aria-hidden="true"></div>
+</main>
+
+<div id="bigqr" hidden><div class="code" id="qrbig"></div><p id="urlbig"></p><p style="font-size:clamp(14px,2vw,22px)">Tap anywhere to close</p></div>
+
+<script src="vendor/qrcode.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const S={get(k){try{return sessionStorage.getItem(k)}catch(e){return null}},set(k,v){try{v==null?sessionStorage.removeItem(k):sessionStorage.setItem(k,v)}catch(e){}}};
+const L={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
+let pw=S.get('cc-admin'),data=null,tab='students',timer=null,lastOk=0,qrFor='';
+
+async function call(path,opts={}){
+  const res=await fetch(path,{...opts,headers:{'Content-Type':'application/json','x-admin-password':pw||'',...(opts.headers||{})}});
+  if(res.status===401){logout('Wrong password');throw new Error('auth')}
+  if(!res.ok)throw new Error(res.status);
+  return res.json();
+}
+function logout(msg){pw=null;S.set('cc-admin',null);clearInterval(timer);$('dash').hidden=true;$('login').hidden=false;$('err').textContent=msg||'';$('pw').value='';$('pw').focus()}
+$('loginf').addEventListener('submit',async e=>{
+  e.preventDefault();pw=$('pw').value;$('err').textContent='';
+  try{await load();S.set('cc-admin',pw);start()}catch(err){if(err.message!=='auth')$('err').textContent='Can’t reach the server.'}
+});
+$('logout').onclick=()=>logout();
+
+function start(){$('login').hidden=true;$('dash').hidden=false;clearInterval(timer);timer=setInterval(()=>load().catch(()=>{}),4000)}
+async function load(){
+  try{data=await call('api/admin/state');lastOk=Date.now();render()}
+  catch(e){$('live').className='live err';$('live').lastElementChild.textContent='Server unreachable';throw e}
+}
+
+/* ---------- Derived numbers ---------- */
+const who=p=>`${p.name} (${p.cls} · T${p.team})`;
+function tally(keyFn,label){
+  const m=new Map();
+  for(const r of data.results)r.players.forEach((p,i)=>{
+    const k=keyFn(p);if(k==null)return;
+    const t=m.get(k)||{k,label:label(p),played:0,wins:0,pf:0,pa:0};
+    t.played++;if(r.winner===i)t.wins++;t.pf+=p.score;t.pa+=r.players[1-i].score;m.set(k,t);
+  });
+  return [...m.values()].map(t=>({...t,losses:t.played-t.wins,pct:t.played?t.wins/t.played:0}))
+    .sort((a,b)=>b.wins-a.wins||b.pct-a.pct||(b.pf-b.pa)-(a.pf-a.pa)||a.label.localeCompare(b.label));
+}
+const pct=x=>Math.round(x*100)+'%';
+function ago(ms){const s=Math.max(0,Math.round(ms/1000));return s<60?s+'s ago':s<3600?Math.round(s/60)+'m ago':new Date(Date.now()-ms).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+const fmtTime=t=>new Date(t).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+
+/* ---------- Render ---------- */
+function render(){
+  $('live').className='live';$('live').lastElementChild.textContent='Live · updated '+new Date(lastOk).toLocaleTimeString();
+  drawQR();
+  const byKey=new Map(data.players.map(p=>[p.key,p]));
+  const students=tally(p=>p.key,p=>who(p));
+  const battlesNow=data.devices.filter(d=>d.status==='battle');
+  const champ=students[0];
+  $('stats').innerHTML=`
+    <div class="stat"><b>${data.players.length}</b><span>Students joined</span></div>
+    <div class="stat"><b>${data.results.length}</b><span>Battles finished</span></div>
+    <div class="stat"><b>${data.devices.length}</b><span>Phones online</span></div>
+    <div class="stat"><b>${battlesNow.length}</b><span>Battles live now</span></div>
+    <div class="stat champ"><span>Current champion</span><b>${champ?esc(champ.label):'No battles yet'}</b>${champ?`<span>${champ.wins} wins · ${champ.losses} losses · ${pct(champ.pct)}</span>`:''}</div>`;
+
+  // Lobby
+  const onlineKeys=new Set(data.devices.flatMap(d=>d.players));
+  $('devcount').textContent=data.devices.length+' phone'+(data.devices.length===1?'':'s');
+  $('devices').innerHTML=data.devices.length?data.devices.sort((a,b)=>(b.status==='battle')-(a.status==='battle')).map(d=>{
+    const ps=d.players.map(k=>byKey.get(k)).filter(Boolean);
+    const names=ps.length===2?`${esc(ps[0].name)} <span class="muted">vs</span> ${esc(ps[1].name)}`:ps.length?esc(ps[0].name):'<span class="muted">Picking players…</span>';
+    const sc=d.status==='battle'&&d.score?` <span class="muted">${d.score[0]}–${d.score[1]}</span>`:'';
+    return `<div class="dev"><span>${names}${sc}</span><span class="pill ${d.status}">${d.status==='battle'?'In battle':'Lobby'}</span></div>`;
+  }).join(''):'<div class="empty">No phones connected right now. Battles played offline upload when phones reconnect.</div>';
+
+  const rec=new Map(students.map(s=>[s.k,s]));
+  $('joincount').textContent=data.players.length+' total';
+  $('joined').innerHTML=data.players.length?data.classes.filter(c=>data.players.some(p=>p.cls===c)).map(c=>`
+    <div class="cls"><h3>${c}</h3><div class="teams">${data.teams.map(t=>{
+      const ps=data.players.filter(p=>p.cls===c&&p.team===t).sort((a,b)=>a.name.localeCompare(b.name));
+      return `<div class="team"><h4>Team ${t}</h4><ul>${ps.map(p=>{const r=rec.get(p.key);
+        return `<li class="${onlineKeys.has(p.key)?'on':''}"><span title="${esc(p.name)}">${esc(p.name)}</span><small>${r?r.wins+'–'+r.losses:''}</small></li>`}).join('')||'<li class="muted">—</li>'}</ul></div>`;
+    }).join('')}</div></div>`).join(''):'<div class="empty">Nobody has joined yet. Students add themselves in the game’s player picker.</div>';
+
+  drawFilters();drawStandings();drawBattles();
+}
+function drawQR(){
+  const url=L.get('cc-qr-url')||data.publicUrl||new URL('./',location.href).href;
+  if(url===qrFor)return;qrFor=url;
+  const q=qrcode(0,'M');q.addData(url);q.make();
+  const svg=q.createSvgTag({cellSize:4,margin:0,scalable:true});
+  $('qr').innerHTML=svg;$('qrbig').innerHTML=svg;$('url').textContent=url;$('urlbig').textContent=url;
+}
+function drawFilters(){
+  const opt=(v,l,cur)=>`<option value="${v}"${v===cur?' selected':''}>${l}</option>`;
+  const c=$('fcls').value||'',t=$('fteam').value||'';
+  $('fcls').innerHTML=opt('','All classes',c)+data.classes.map(x=>opt(x,x,c)).join('');
+  $('fteam').innerHTML=opt('','All teams',t)+data.teams.map(x=>opt(x,'Team '+x,t)).join('');
+  $('fteam').hidden=tab==='classes';$('fcls').hidden=false;
+}
+const fC=()=>$('fcls').value,fT=()=>$('fteam').value;
+const matches=p=>(!fC()||p.cls===fC())&&(!fT()||p.team===fT());
+function drawStandings(){
+  let rows,head;
+  if(tab==='students'){rows=tally(p=>matches(p)?p.key:null,p=>who(p));head='Student'}
+  else if(tab==='teams'){rows=tally(p=>matches(p)?p.cls+' · Team '+p.team:null,p=>p.cls+' · Team '+p.team);head='Team'}
+  else{rows=tally(p=>!fC()||p.cls===fC()?p.cls:null,p=>p.cls);head='Class'}
+  $('standings').innerHTML=rows.length?`<table><thead><tr><th>#</th><th>${head}</th><th class="n">Won</th><th class="n">Lost</th><th class="n">Played</th><th class="n">Win %</th><th class="n">Points</th></tr></thead><tbody>${
+    rows.map((r,i)=>`<tr><td><span class="rank">${i+1}</span></td><td>${esc(r.label)}</td><td class="n w">${r.wins}</td><td class="n l">${r.losses}</td><td class="n">${r.played}</td><td class="n">${pct(r.pct)}</td><td class="n">${r.pf}–${r.pa}</td></tr>`).join('')
+  }</tbody></table>`:'<div class="empty">No finished battles yet.</div>';
+}
+function filteredBattles(){return data.results.filter(r=>r.players.some(matches)).sort((a,b)=>b.at-a.at)}
+function drawBattles(){
+  const rows=filteredBattles();
+  $('battles').innerHTML=rows.length?`<table><thead><tr><th>When</th><th>Winner</th><th class="n">Score</th><th>Runner-up</th><th class="n">Rounds</th></tr></thead><tbody>${
+    rows.slice(0,300).map(r=>{const w=r.players[r.winner],l=r.players[1-r.winner];
+      return `<tr><td class="muted">${fmtTime(r.at)}</td><td class="w">${esc(who(w))}</td><td class="n">${w.score}–${l.score}</td><td>${esc(who(l))}</td><td class="n">${r.rounds}</td></tr>`}).join('')
+  }</tbody></table>${rows.length>300?`<p class="muted">Showing latest 300 of ${rows.length}. Download the CSV for all.</p>`:''}`:'<div class="empty">No finished battles yet.</div>';
+}
+
+$('tabs').addEventListener('click',e=>{const b=e.target.closest('[data-t]');if(!b)return;tab=b.dataset.t;
+  document.querySelectorAll('#tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));drawFilters();drawStandings()});
+$('fcls').onchange=$('fteam').onchange=()=>{drawStandings();drawBattles()};
+$('big').onclick=()=>{$('bigqr').hidden=false};
+$('bigqr').onclick=()=>{$('bigqr').hidden=true};
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText(qrFor);$('copy').textContent='Copied'}catch(e){prompt('Copy this link',qrFor)}setTimeout(()=>$('copy').textContent='Copy link',1500)};
+$('editurl').onclick=()=>{const v=prompt('Link the QR code should open (leave empty for this server):',qrFor);if(v===null)return;L.set('cc-qr-url',v.trim()||null);qrFor='';drawQR()};
+$('csv').onclick=()=>{
+  const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  const lines=[['time','winner','winner_class','winner_team','winner_score','runner_up','runner_up_class','runner_up_team','runner_up_score','rounds'].join(',')];
+  for(const r of filteredBattles()){const w=r.players[r.winner],l=r.players[1-r.winner];
+    lines.push([new Date(r.at).toISOString(),w.name,w.cls,w.team,w.score,l.name,l.cls,l.team,l.score,r.rounds].map(q).join(','))}
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/csv'}));
+  a.download='cab-clash-results-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+async function reset(what,msg){if(!confirm(msg))return;await call('api/admin/reset',{method:'POST',body:JSON.stringify({what})});await load()}
+$('resetr').onclick=()=>reset('results','Delete every battle result? Students stay joined.');
+$('reseta').onclick=()=>reset('all','Delete every battle result AND every student?');
+
+if(pw)load().then(start).catch(e=>{if(e.message!=='auth')logout('Can’t reach the server.')});else logout();
+</script>
+</body>
+</html>

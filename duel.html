@@ -47,7 +47,7 @@ body{background:var(--night);color:var(--ink);font-family:var(--body);overflow:h
 .panel{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;max-width:420px;text-align:center}
 .who{font:700 16px var(--body);letter-spacing:.2em;text-transform:uppercase}
 #p0 .who{color:var(--teal)} #p1 .who{color:var(--yellow)}
-.half.go .who,.half.win .who{color:var(--night)}
+#p0.go .who,#p0.win .who,#p1.go .who,#p1.win .who{color:var(--night)}
 .big{font-family:var(--display);font-size:clamp(26px,8.5vw,48px);line-height:1.05;text-wrap:balance}
 .huge{font-family:var(--display);font-size:clamp(56px,22vw,120px);line-height:1;font-variant-numeric:tabular-nums}
 .rule{font-size:20px;line-height:1.25;max-width:32ch;opacity:.85;text-wrap:balance}
@@ -86,6 +86,40 @@ body{background:var(--night);color:var(--ink);font-family:var(--body);overflow:h
 .half .q-text{font-size:clamp(19px,5.4vw,26px)}
 .half .q-swatch{width:min(50%,160px)}
 .half .clock{width:clamp(96px,26vw,130px)}
+/* Player picker: a normal upright sheet over the board, shown before each new pairing. */
+#setup{position:fixed;inset:0;z-index:5;overflow-y:auto;background:var(--night);user-select:text;-webkit-user-select:text;
+  padding:calc(env(safe-area-inset-top,0px) + 18px) 16px calc(env(safe-area-inset-bottom,0px) + 24px)}
+#setup[hidden]{display:none}
+.su{max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.su h1{font:400 clamp(26px,8vw,36px) var(--display);color:var(--yellow);margin:0}
+.su p{margin:0;font-size:18px;line-height:1.3;color:var(--dim)}
+.seats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seat{--c:var(--teal);text-align:left;font:inherit;color:var(--ink);background:#1c1f28;border:2px solid #3a4050;border-radius:14px;padding:10px 12px;min-height:84px;display:flex;flex-direction:column;gap:2px;cursor:pointer}
+.seat[data-seat="1"]{--c:var(--yellow)}
+.seat small{font:700 13px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--c)}
+.seat b{font:700 22px/1.1 var(--body);overflow-wrap:anywhere}
+.seat span{font-size:16px;color:var(--dim)}
+.seat.on{border-color:var(--c);box-shadow:0 0 0 2px var(--c) inset}
+.seat.empty b{color:var(--dim)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.chip,.sbtn{font:700 17px var(--body);color:var(--ink);background:#232733;border:2px solid #3a4050;border-radius:999px;padding:6px 14px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--yellow);border-color:var(--yellow);color:var(--night)}
+.sbtn{border-radius:10px;flex:1}
+#q,#nname{font:500 20px var(--body);color:var(--ink);background:#1c1f28;border:2px solid #3a4050;border-radius:12px;padding:10px 12px;width:100%}
+#q:focus,#nname:focus{outline:none;border-color:var(--yellow)}
+.plist{display:flex;flex-direction:column;gap:6px;max-height:min(42vh,360px);overflow-y:auto;padding-right:2px}
+.pl{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;font:700 20px var(--body);color:var(--ink);background:#1c1f28;border:2px solid #2a2f3b;border-radius:12px;padding:10px 12px;cursor:pointer}
+.pl small{font:500 16px var(--body);color:var(--dim);white-space:nowrap}
+.pl.s0{border-color:var(--teal)} .pl.s1{border-color:var(--yellow)}
+.empty-note{color:var(--dim);font-size:17px;padding:8px 2px}
+details.add{background:#1c1f28;border:2px dashed #3a4050;border-radius:14px;padding:10px 12px}
+details.add summary{font:700 19px var(--body);cursor:pointer;color:var(--yellow)}
+details.add[open]{display:flex;flex-direction:column;gap:10px}
+details.add label{font:700 13px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.cta{font:400 20px var(--display);color:var(--night);background:var(--go);border:0;border-radius:14px;padding:16px;cursor:pointer}
+.cta:disabled{background:#2a2f3b;color:var(--dim);cursor:not-allowed}
+.sync{font-size:16px!important;text-align:center}
+.su a{color:var(--dim);text-align:center;font-size:17px}
 #mid a,#mid button{font:700 15px var(--body);letter-spacing:.06em;text-transform:none;background:none;cursor:pointer;color:var(--ink);text-decoration:none;border:1px solid #3a4050;border-radius:8px;padding:4px 10px;display:inline-block;margin-top:2px}
 </style>
 </head>
@@ -94,17 +128,44 @@ body{background:var(--night);color:var(--ink);font-family:var(--body);overflow:h
 <div id="app">
   <section class="half" id="p0"></section>
   <div class="strip">
-    <div class="sc" id="s0"><span id="n0">0</span><small>Teal</small></div>
+    <div class="sc" id="s0"><span id="n0">0</span><small id="l0">Teal</small></div>
     <div id="mid">First to 5</div>
-    <div class="sc" id="s1"><small>Yellow</small><span id="n1">0</span></div>
+    <div class="sc" id="s1"><small id="l1">Yellow</small><span id="n1">0</span></div>
   </div>
   <section class="half" id="p1"></section>
 </div>
 
+<div id="setup" hidden>
+  <div class="su">
+    <h1>Who’s battling?</h1>
+    <p>Agree on one phone for this battle and lay it flat between you. Teal plays from the top half, Yellow from the bottom.</p>
+    <div class="seats">
+      <button type="button" class="seat" data-seat="0"></button>
+      <button type="button" class="seat" data-seat="1"></button>
+    </div>
+    <div class="row"><button type="button" class="sbtn" id="swap">⇅ Swap seats</button><button type="button" class="sbtn" id="rand">🎲 Random pair</button></div>
+    <div class="row" id="clsf"></div>
+    <input id="q" type="search" placeholder="Search students" autocomplete="off" aria-label="Search students">
+    <div class="plist" id="plist"></div>
+    <details class="add" id="addbox">
+      <summary>+ New student</summary>
+      <input id="nname" type="text" maxlength="40" placeholder="Full name" autocomplete="off" aria-label="Student name">
+      <label>Class</label><div class="row" id="ncls"></div>
+      <label>Team</label><div class="row" id="nteam"></div>
+      <button type="button" class="sbtn" id="nadd">Add and pick</button>
+    </details>
+    <button type="button" class="cta" id="startb" disabled>Start battle</button>
+    <p class="sync" id="sync"></p>
+    <a href="./">‹ Menu</a>
+  </div>
+</div>
+
+<script src="tracker.js"></script>
 <script src="sfx.js"></script>
 <script src="games.js"></script>
 <script>
-const P=['Teal','Yellow'], TARGET=5;
+const TARGET=5;
+let P=['Teal','Yellow'],seats=[null,null];
 const halves=[document.getElementById('p0'),document.getElementById('p1')];
 let score=[0,0],round=0,state='menu',ready=[false,false],game=null,g={},timers=[],bag=[],lastGame=null;
 
@@ -205,14 +266,15 @@ function finishClock(){
   if(state!=='play')return;
   const f=t=>t==null?'no tap':t.toFixed(2)+'s';
   const d=g.t.map(t=>t==null?Infinity:Math.abs(t-g.target));
-  const note=`Target ${g.target}.00s · Teal ${f(g.t[0])} · Yellow ${f(g.t[1])}`;
+  const note=`Target ${g.target}.00s · ${P[0]} ${f(g.t[0])} · ${P[1]} ${f(g.t[1])}`;
   if(d[0]===d[1])award(null,note);else award(d[0]<d[1]?0:1,note,note);
 }
 
 /* ---------- Flow ---------- */
 function menu(){
   clearTimers();state='menu';ready=[false,false];score=[0,0];round=0;bag=[];lastGame=null;strip('First to 5');
-  document.getElementById('mid').innerHTML='First to 5<br><a href="./">‹ Menu</a> <button type="button" data-sfx-toggle>'+SFX.label()+'</button>';
+  CC.setPresence('lobby',seats);
+  document.getElementById('mid').innerHTML='First to 5<br><button type="button" id="pick">Players</button> <button type="button" data-sfx-toggle>'+SFX.label()+'</button>';
   both(i=>set(i,`<div class="who">${P[i]}</div><div class="big">Tap to ready</div><div class="rule">Hold the phone flat between you. The half facing you is yours.</div>`,'idle'));
 }
 function pickGame(){
@@ -222,6 +284,7 @@ function pickGame(){
 }
 function nextRound(){
   clearTimers();round++;game=pickGame();state='intro';strip('Round '+round);
+  CC.setPresence('battle',seats,score);
   both(i=>set(i,`<div class="who">${P[i]}</div><div class="big">${game.name}</div><div class="rule">${game.rule}</div>`,'idle'));
   ['3','2','1'].forEach((n,k)=>later(()=>{strip(n);SFX.play('tick');both(i=>{const p=halves[i].querySelector('.panel');let c=p.querySelector('.huge');if(!c){c=document.createElement('div');c.className='huge';p.appendChild(c)}c.textContent=n})},2200+k*650));
   later(()=>{strip('Round '+round);SFX.play('go');game.start()},2200+3*650);
@@ -241,7 +304,9 @@ function award(w,note,loseMsg){
 }
 function finale(){
   state='over';const w=score[0]>score[1]?0:1;SFX.play('fanfare');strip('Final '+score[0]+' – '+score[1]);
-  set(w,`<div class="who">${P[w]}</div><div class="big">Champion of the back seat</div><div class="rule">Final score ${score[w]} – ${score[1-w]}</div>`,'win');
+  CC.recordResult(seats,score,w,round);CC.setPresence('lobby',seats);
+  const s=seats[w];
+  set(w,`<div class="who">Final winner</div><div class="big">${P[w]}</div><div class="rule">${s.cls} · Team ${s.team}</div><div class="rule">Final score ${score[w]} – ${score[1-w]} · result saved</div>`,'win');
   set(1-w,`<div class="who">${P[1-w]}</div><div class="big">Snacks are on you</div><div class="rule">Final score ${score[1-w]} – ${score[w]}</div>`,'lose');
   later(()=>{state='rematch';both(i=>halves[i].querySelector('.panel').insertAdjacentHTML('beforeend','<div class="rule"><b>Tap for a rematch</b></div>'))},1400);
 }
@@ -253,10 +318,83 @@ function handle(i,a){
   }else if(state==='play'){game.tap(i,a)}
   else if(state==='rematch'){menu()}
 }
+/* ---------- Player picker ---------- */
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $=id=>document.getElementById(id);
+let active=0,clsFilter=(()=>{try{return localStorage.getItem('cc-cls')||'All'}catch(e){return 'All'}})(),newCls=null,newTeam=null;
+function chips(el,items,cur,label){el.innerHTML=items.map(v=>`<button type="button" class="chip" data-v="${v}" aria-pressed="${v===cur}">${label?label(v):v}</button>`).join('')}
+function pool(){
+  const q=$('q').value.trim().toLowerCase();
+  return CC.roster().filter(p=>(clsFilter==='All'||p.cls===clsFilter)&&(!q||p.name.toLowerCase().includes(q)))
+    .sort((a,b)=>a.cls.localeCompare(b.cls)||a.name.localeCompare(b.name));
+}
+function drawSetup(){
+  document.querySelectorAll('.seat').forEach(b=>{
+    const i=+b.dataset.seat,p=seats[i];
+    b.className='seat'+(i===active?' on':'')+(p?'':' empty');
+    b.innerHTML=`<small>${i?'Yellow · bottom':'Teal · top'}</small><b>${p?esc(p.name):'Tap to pick'}</b><span>${p?p.cls+' · Team '+p.team:'&nbsp;'}</span>`;
+  });
+  chips($('clsf'),['All',...CC.CLASSES],clsFilter);
+  const list=pool();
+  $('plist').innerHTML=list.length?list.map(p=>{
+    const s=seats.findIndex(x=>x&&x.key===p.key);
+    return `<button type="button" class="pl${s<0?'':' s'+s}" data-k="${esc(p.key)}"><span>${esc(p.name)}</span><small>${p.cls} · Team ${p.team}</small></button>`;
+  }).join(''):`<div class="empty-note">${CC.roster().length?'No students match.':'No students yet. Add yourselves with “New student” below.'}</div>`;
+  chips($('ncls'),CC.CLASSES,newCls);chips($('nteam'),CC.TEAMS,newTeam,t=>'Team '+t);
+  $('startb').disabled=!(seats[0]&&seats[1]&&seats[0].key!==seats[1].key);
+  $('startb').textContent=$('startb').disabled?'Pick two players':'Start battle';
+}
+function seat(p){
+  const other=seats.findIndex(x=>x&&x.key===p.key);
+  if(other>=0&&other!==active)seats[other]=seats[active];
+  seats[active]=p;
+  if(!seats[1-active])active=1-active;
+  drawSetup();
+}
+function showSetup(){clearTimers();state='setup';CC.setPresence('lobby',seats);$('setup').hidden=false;drawSetup()}
+function applyPlayers(){
+  P=seats.map(p=>esc(p.name));
+  $('l0').textContent=seats[0].name;$('l1').textContent=seats[1].name;
+  try{sessionStorage.setItem('cc-seats',JSON.stringify(seats))}catch(e){}
+}
+$('setup').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.classList.contains('seat')){active=+b.dataset.seat;drawSetup()}
+  else if(b.dataset.k){const p=CC.roster().find(x=>x.key===b.dataset.k);if(p)seat(p)}
+  else if(b.parentElement.id==='clsf'){clsFilter=b.dataset.v;try{localStorage.setItem('cc-cls',clsFilter)}catch(e){}drawSetup()}
+  else if(b.parentElement.id==='ncls'){newCls=b.dataset.v;drawSetup()}
+  else if(b.parentElement.id==='nteam'){newTeam=b.dataset.v;drawSetup()}
+  else if(b.id==='swap'){seats.reverse();drawSetup()}
+  else if(b.id==='rand'){
+    const list=pool();if(list.length<2){alert('Need at least two students in this list.');return}
+    const a=list[ri(0,list.length-1)];
+    const rivals=list.filter(p=>p.key!==a.key),cross=rivals.filter(p=>p.team!==a.team||p.cls!==a.cls);
+    const pick=cross.length?cross:rivals;seats=shuffle([a,pick[ri(0,pick.length-1)]]);active=0;drawSetup();
+  }
+  else if(b.id==='nadd'){
+    const name=$('nname').value;
+    if(!name.trim()||!newCls||!newTeam){alert('Enter a name, then choose a class and a team.');return}
+    const p=CC.addPlayer(name,newCls,newTeam);if(!p)return;
+    $('nname').value='';$('addbox').open=false;seat(p);
+  }
+  else if(b.id==='startb'&&!b.disabled){$('setup').hidden=true;applyPlayers();SFX.play('honk');menu()}
+});
+$('q').addEventListener('input',drawSetup);
+document.addEventListener('click',e=>{if(e.target.id==='pick'&&(state==='menu'||state==='rematch'))showSetup()});
+let rosterSig='';
+CC.onStatus(s=>{
+  $('sync').textContent=!s.canSync?'Opened from a file: results stay on this phone.'
+    :s.pending?`${s.online?'Uploading':'Offline'} · ${s.pending} result${s.pending>1?'s':''} saved on this phone, sent when back online`
+    :s.online?'Connected to tracker · all results sent':'Offline · results will be saved on this phone';
+  const sig=JSON.stringify(CC.roster());
+  if(state==='setup'&&sig!==rosterSig&&!$('q').matches(':focus'))drawSetup();
+  rosterSig=sig;
+});
+
 halves.forEach((h,i)=>h.addEventListener('pointerdown',e=>{
   e.preventDefault();const b=e.target.closest('[data-a]');handle(i,b?b.dataset.a:null);
 }));
-menu();
+try{const s=JSON.parse(sessionStorage.getItem('cc-seats'));if(s&&s[0]&&s[1]){seats=s;applyPlayers();menu()}else showSetup()}catch(e){showSetup()}
 </script>
 
 <script>if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{})</script>

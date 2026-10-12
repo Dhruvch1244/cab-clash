@@ -1,15 +1,49 @@
-# Cab Clash (offline)
+# Cab Clash (offline, in person, with a class tracker)
 
-Quick-fire mini-games for bored passengers, played in person on one phone. No internet, no accounts, no servers.
+Quick-fire two-player mini-games on one shared phone. The game itself never needs the internet;
+a small tracker server collects only the final result of each battle for the teacher.
 
-- 2 players share one phone, each owns half the screen. First to 5 wins.
-- 31 mini-games (reflex, maths, words, memory and trivia).
+Forked from [vickky1802/cab-clash](https://github.com/vickky1802/cab-clash); the online party mode was removed.
 
-Forked from [vickky1802/cab-clash](https://github.com/vickky1802/cab-clash) with the online party mode removed and everything bundled locally.
+## How a battle works
 
-## Playing offline
+1. Scan the QR code on the admin screen (or open the server link).
+2. The two players agree on one phone, then pick themselves in **Who's battling?** — or add themselves as a
+   **New student** with name, class (SE1–SE5) and team (1–4). **Random pair** picks two players for you.
+3. Lay the phone flat between you: Teal plays from the top half, Yellow from the bottom. First to 5 wins.
+4. The **final winner** is shown and the result is saved on the phone, then sent to the tracker as soon as
+   the phone can reach the server. Rounds are never uploaded, only `winner, loser, score, rounds, time`.
 
-Everything the game needs (pages, scripts, fonts) is in this folder; nothing is loaded from the internet.
+After the first visit the game loads and plays with no connection; queued results upload when the phone is back online.
 
-- **From a website (e.g. GitHub Pages):** open it once while online. A service worker saves every file, so afterwards it loads with no connection. Use "Add to Home Screen" to get an app icon.
-- **From the files:** copy the folder to the device and open `index.html`, or serve it locally: `python3 -m http.server`.
+## Admin screen
+
+`http://<server>:9000/admin` — password `cd2026` (change with `ADMIN_PASSWORD`).
+
+- QR code to the game (with **Show big** for a projector)
+- **Lobby**: phones online now, who is picking and who is mid-battle, plus every joined student by class and team
+- Standings for students, teams and classes, the current champion, the full battle log, CSV download, reset
+
+## Run it
+
+```bash
+node server.js            # http://localhost:9000  (Node 16+, no npm install)
+```
+
+Env: `PORT` (9000), `ADMIN_PASSWORD` (cd2026), `DATA_DIR` (./data), `PUBLIC_URL` (link in the QR code).
+Data lives in `DATA_DIR/players.json` and `DATA_DIR/results.jsonl`.
+
+## Spin up on EC2
+
+With the AWS CLI configured:
+
+```bash
+./deploy/launch-ec2.sh ap-south-1     # creates SG (port 9000 open) + t3.micro, prints the game and admin links
+```
+
+Or launch any Amazon Linux 2023 / Ubuntu instance by hand, open inbound TCP 9000 in its security group,
+and paste `deploy/user-data.sh` into **Advanced details → User data**.
+
+**Offline caching needs HTTPS.** Browsers only allow the offline cache (service worker) on `https://` or
+`localhost`. Over plain `http://IP:9000` the game still plays without signal once the page is open, and results
+still queue on the phone, but reopening the page with no connection needs HTTPS (e.g. a domain behind a TLS proxy).
